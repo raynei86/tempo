@@ -1,5 +1,57 @@
-(uiop:define-package tempo.duration
-  (:use #:cl))
+(uiop:define-package #:tempo.duration
+  (:use #:cl)
+  (:export
+   ;; Type and accessors
+   #:duration
+   #:duration-p
+   #:make-duration
+   #:duration-seconds
+
+   ;; Unit constructors
+   #:days
+   #:hours
+   #:minutes
+   #:seconds
+   #:milliseconds
+   #:microseconds
+   #:nanoseconds
+
+   ;; Conversions & Extraction
+   #:in-days
+   #:in-hours
+   #:in-minutes
+   #:in-seconds
+   #:in-milliseconds
+   #:in-microseconds
+   #:in-nanoseconds
+   #:destructure-duration
+
+   ;; Arithmetic
+   #:duration+
+   #:duration-
+   #:duration*
+   #:duration/
+   #:duration-divide
+   #:duration-floor
+   #:duration-ceiling
+   #:duration-round
+   #:duration-abs
+
+   ;; Predicates & Comparison
+   #:duration-zerop
+   #:duration-plusp
+   #:duration-minusp
+   #:duration=
+   #:duration/=
+   #:duration<
+   #:duration<=
+   #:duration>
+   #:duration>=
+
+   ;; Formatting
+   #:format-duration-iso
+   #:write-duration-to-iso
+   #:format-duration))
 
 (in-package #:tempo.duration)
 
@@ -107,12 +159,11 @@ scaled down duration or a ratio between two durations."
 
 (defun duration/= (duration &rest durations)
   (declare (dynamic-extent durations))
-  (declare (ignore duration))
-  (if (null durations)
-      t
-      (loop :for (d . rest) :on durations
-            :always (loop :for other :in rest
-			  :never (= (in-seconds d) (in-seconds other))))))
+  (let ((all (cons duration durations)))
+    (declare (dynamic-extent all))
+    (loop :for (d . rest) :on all
+          :always (loop :for other :in rest
+                        :never (= (in-seconds d) (in-seconds other))))))
 
 (defun duration-abs (duration)
   (make-duration :seconds (abs (in-seconds duration))))
@@ -148,6 +199,11 @@ scaled down duration or a ratio between two durations."
   "Return DURATION formatted as an ISO-8601 string."
   (with-output-to-string (s)
     (write-duration-to-iso duration s)))
+
+(defun format-duration (stream duration &optional colon-p at-sign-p)
+  "A cl:format directive function: ~/tempo:format-duration/."
+  (declare (ignore colon-p at-sign-p))
+  (write-duration-to-iso duration stream))
 
 (defmethod print-object ((obj duration) stream)
   (print-unreadable-object (obj stream :type t)

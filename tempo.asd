@@ -6,8 +6,8 @@
   :serial t
   :components ((:module "src"
                 :components
-                ((:file "main")
-                 (:file "duration"))))
+                ((:file "duration")
+                 (:file "main"))))
   :description "A Date and Time Library"
   :in-order-to ((test-op (test-op "tempo/tests"))))
 
