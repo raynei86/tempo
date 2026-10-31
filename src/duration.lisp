@@ -90,6 +90,10 @@ scaled down duration or a ratio between two durations."
   (let ((res (duration-seconds resolution)))
     (make-duration :seconds (* (round (duration-seconds duration) res) res))))
 
+(defun duration-divide (duration divisor)
+  (multiple-value-bind (quotient remainder) (truncate (as-seconds duration) divisor)
+    (values quotient (make-duration :seconds remainder))))
+
 (defmacro define-comparison-operator (name operator)
   `(defun ,name (duration &rest durations)
      (declare (dynamic-extent durations))
