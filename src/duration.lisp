@@ -30,21 +30,21 @@
 (defun seconds (n)
   (make-duration :seconds n))
 
-(defun miliseconds (n)
-  (make-duration :seconds (/ n 10)))
+(defun milliseconds (n)
+  (make-duration :seconds (/ n 1000)))
 
 (defun microseconds (n)
-  (make-duration :seconds (/ n 100)))
+  (make-duration :seconds (/ n 1000000)))
 
 (defun nanoseconds (n)
-  (make-duration :seconds (/ n 1000)))
+  (make-duration :seconds (/ n 1000000000)))
 
 ;; Converting to other units
 (defun as-seconds (duration)
   (duration-seconds duration))
 
-(defun as-miliseconds (duration)
-  (/ (as-seconds duration) 10))
+(defun as-milliseconds (duration)
+  (* (as-seconds duration) 1000))
 
 (defun destructure-duration (duration)
   (let* ((total-seconds (as-seconds duration))
