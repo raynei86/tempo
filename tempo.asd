@@ -15,10 +15,11 @@
   :author "Lihui Zhang"
   :license "MIT"
   :depends-on ("tempo"
-               "rove")
+	       "rove")
   :serial t
   :components ((:module "tests"
                 :components
+		((:file "duration"))
                 ((:file "main"))))
   :description "Test system for tempo"
-  :perform (test-op (op c) (symbol-call :rove :run c)))
+  :perform (test-op (op c) (symbol-call :rove :run c))))
