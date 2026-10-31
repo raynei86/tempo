@@ -5,3 +5,8 @@ Currently WIP.
 Trying to define what a modern Common Lisp library should be
 like. Performance isn't really a top priority, ergonomics and breadth
 is.
+
+* AI Statement
+This library was written with the assistance of AI. Specifically the
+type hints and tests are written by AI. AI was also consulted for code
+review. The rest of the code is handwritten by me.
