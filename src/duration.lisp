@@ -85,7 +85,8 @@
      (if (null durations)
 	 t
 	 (loop :for i in durations
-	       :always (,operator (as-seconds duration) (as-seconds i))))))
+	       :and prev-i = duration then i
+	       :always (,operator (as-seconds prev-i) (as-seconds i))))))
 
 (define-comparison-operator duration= =)
 (define-comparison-operator duration/= /=)
