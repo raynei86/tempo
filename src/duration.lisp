@@ -79,44 +79,20 @@
 (defun duration/ (duration scalar)
   (make-duration :seconds (/ (as-seconds duration) scalar)))
 
-(defun duration= (duration &rest durations)
-  (declare (dynamic-extent durations))
-  (if (null durations)
-      t
-      (loop :for i in durations
-	    :always (= (as-seconds duration) (as-seconds i)))))
+(defmacro define-comparison-operator (name operator)
+  `(defun ,name (duration &rest durations)
+     (declare (dynamic-extent durations))
+     (if (null durations)
+	 t
+	 (loop :for i in durations
+	       :always (,operator (as-seconds duration) (as-seconds i))))))
 
-(defun duration/= (duration &rest durations)
-  (declare (dynamic-extent durations))
-  (not (duration= duration durations)))
-
-(defun duration< (duration &rest durations)
-  (declare (dynamic-extent durations))
-  (if (null durations)
-      t
-      (loop :for i in durations
-	    :always (< (as-seconds duration) (as-seconds i)))))
-
-(defun duration<= (duration &rest durations)
-  (declare (dynamic-extent durations))
-  (if (null durations)
-      t
-      (loop :for i in durations
-	    :always (<= (as-seconds duration) (as-seconds i)))))
-
-(defun duration> (duration &rest durations)
-  (declare (dynamic-extent durations))
-  (if (null durations)
-      t
-      (loop :for i in durations
-	    :always (> (as-seconds duration) (as-seconds i)))))
-
-(defun duration>= (duration &rest durations)
-  (declare (dynamic-extent durations))
-  (if (null durations)
-      t
-      (loop :for i in durations
-	    :always (>= (as-seconds duration) (as-seconds i)))))
+(define-comparison-operator duration= =)
+(define-comparison-operator duration/= /=)
+(define-comparison-operator duration< <)
+(define-comparison-operator duration<= <=)
+(define-comparison-operator duration> >)
+(define-comparison-operator duration>= >=)
 
 (defun duration-abs (duration)
   (make-duration :seconds (abs (as-seconds duration))))
