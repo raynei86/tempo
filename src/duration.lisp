@@ -113,25 +113,27 @@ scaled down duration or a ratio between two durations."
 
 (defun write-duration-to-iso (duration stream)
   (let ((total (in-seconds duration)))
-    (when (zerop total) (write-string "PT0S" stream))
-    (when (minusp total)
-      (write-char #\- stream)
-      (setf total (abs total)))
+    (if (zerop total)
+	(write-string "PT0S" stream)
+	(progn
+	  (when (minusp total)
+	    (write-char #\- stream)
+	    (setf total (abs total)))
 
-    (bind:bind (((:values days rd)        (truncate total 86400))
-	   ((:values hours rh)       (truncate rd 3600))
-	   ((:values minutes seconds) (truncate rh 60)))
+	  (bind:bind (((:values days rd)        (truncate total 86400))
+		      ((:values hours rh)       (truncate rd 3600))
+		      ((:values minutes seconds) (truncate rh 60)))
 
-      (format stream "P~@[~dD~]~:[~;T~]~@[~dH~]~@[~dM~]"
-	      (and (plusp days) days)
-	      (plusp (+ hours minutes seconds))
-	      (and (plusp hours) hours)
-	      (and (plusp minutes) minutes))
+	    (format stream "P~@[~dD~]~:[~;T~]~@[~dH~]~@[~dM~]"
+		    (and (plusp days) days)
+		    (plusp (+ hours minutes seconds))
+		    (and (plusp hours) hours)
+		    (and (plusp minutes) minutes))
 
-      (when (plusp seconds)
-	(if (integerp seconds)
-	    (format stream "~dS" seconds)
-	    (format stream "~FS" (float seconds 1.0d0)))))))
+	    (when (plusp seconds)
+	      (if (integerp seconds)
+		  (format stream "~dS" seconds)
+		  (format stream "~FS" (float seconds 1.0d0)))))))))
 
 (defun format-duration-iso (duration)
   "Return DURATION formatted as an ISO-8601 string."
