@@ -48,12 +48,11 @@
 
 (defun duration- (duration &rest durations)
   (declare (dynamic-extent durations))
-  (if (null (cdr durations))
+  (if (null durations)
       (make-duration :seconds (- (in-seconds duration)))
-      (loop :for i in (cdr durations)
+      (loop :for i in durations
 	    :sum (- (in-seconds i)) into difference
-	    :with first-duration = (in-seconds (first durations))
-	    :finally (return (make-duration :seconds (+ first-duration difference))))))
+	    :finally (return (make-duration :seconds (+ (in-seconds duration) difference))))))
 
 (defun duration* (a b)
   (etypecase a
