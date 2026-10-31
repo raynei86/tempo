@@ -11,13 +11,13 @@
   (seconds 0 :type rational :read-only t))
 
 ;; Unit constructors
-(defun days (n)         (make-duration :seconds (* n 86400)))
-(defun hours (n)        (make-duration :seconds (* n 3600)))
-(defun minutes (n)      (make-duration :seconds (* n 60)))
-(defun seconds (n)      (make-duration :seconds n))
-(defun milliseconds (n) (make-duration :seconds (/ n 1000)))
-(defun microseconds (n) (make-duration :seconds (/ n 1000000)))
-(defun nanoseconds (n)  (make-duration :seconds (/ n 1000000000)))
+(defun days (n)         (make-duration :seconds (rationalize (* n 86400))))
+(defun hours (n)        (make-duration :seconds (rationalize (* n 3600))))
+(defun minutes (n)      (make-duration :seconds (rationalize (* n 60))))
+(defun seconds (n)      (make-duration :seconds (rationalize n)))
+(defun milliseconds (n) (make-duration :seconds (rationalize (/ n 1000))))
+(defun microseconds (n) (make-duration :seconds (rationalize (/ n 1000000))))
+(defun nanoseconds (n)  (make-duration :seconds (rationalize (/ n 1000000000))))
 
 ;; Converting to other units
 (defun in-days (d)         (/ (duration-seconds d) 86400))
