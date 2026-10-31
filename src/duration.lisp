@@ -15,36 +15,22 @@
     (format stream "P")))
 
 ;; Unit constructors
-(defun weeks (n)
-  (days (* n 7)))
-
-(defun days (n)
-  (hours (* n 24)))
-
-(defun hours (n)
-  (minutes (* n 60)))
-
-(defun minutes (n)
-  (make-duration :seconds (* n 60)))
-
-(defun seconds (n)
-  (make-duration :seconds n))
-
-(defun milliseconds (n)
-  (make-duration :seconds (/ n 1000)))
-
-(defun microseconds (n)
-  (make-duration :seconds (/ n 1000000)))
-
-(defun nanoseconds (n)
-  (make-duration :seconds (/ n 1000000000)))
+(defun days (n)         (make-duration :seconds (* n 86400)))
+(defun hours (n)        (make-duration :seconds (* n 3600)))
+(defun minutes (n)      (make-duration :seconds (* n 60)))
+(defun seconds (n)      (make-duration :seconds n))
+(defun milliseconds (n) (make-duration :seconds (/ n 1000)))
+(defun microseconds (n) (make-duration :seconds (/ n 1000000)))
+(defun nanoseconds (n)  (make-duration :seconds (/ n 1000000000)))
 
 ;; Converting to other units
-(defun as-seconds (duration)
-  (duration-seconds duration))
-
-(defun as-milliseconds (duration)
-  (* (as-seconds duration) 1000))
+(defun as-days (d)         (/ (duration-seconds d) 86400))
+(defun as-hours (d)        (/ (duration-seconds d) 3600))
+(defun as-minutes (d)      (/ (duration-seconds d) 60))
+(defun as-seconds (d)      (duration-seconds d))
+(defun as-milliseconds (d) (* (duration-seconds d) 1000))
+(defun as-microseconds (d) (* (duration-seconds d) 1000000))
+(defun as-nanoseconds (d)  (* (duration-seconds d) 1000000000))
 
 (defun destructure-duration (duration)
   (let* ((total-seconds (as-seconds duration))
