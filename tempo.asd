@@ -3,9 +3,11 @@
   :author "Lihui Zhang"
   :license "MIT"
   :depends-on ()
+  :serial t
   :components ((:module "src"
                 :components
-                ((:file "main"))))
+                ((:file "main")
+                 (:file "duration"))))
   :description "A Date and Time Library"
   :in-order-to ((test-op (test-op "tempo/tests"))))
 
@@ -14,6 +16,7 @@
   :license "MIT"
   :depends-on ("tempo"
                "rove")
+  :serial t
   :components ((:module "tests"
                 :components
                 ((:file "main"))))
