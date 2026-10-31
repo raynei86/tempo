@@ -62,6 +62,43 @@
 (defstruct duration
   (seconds 0 :type rational :read-only t))
 
+(declaim (inline seconds minutes hours days
+                 milliseconds microseconds nanoseconds
+                 in-seconds in-minutes in-hours in-days
+                 in-milliseconds in-microseconds in-nanoseconds
+                 duration-zerop duration-plusp duration-minusp
+                 duration-abs))
+
+(declaim (ftype (function (real) (values duration &optional))
+                days hours minutes seconds
+                milliseconds microseconds nanoseconds)
+         (ftype (function (duration) (values rational &optional))
+                in-days in-hours in-minutes in-seconds
+                in-milliseconds in-microseconds in-nanoseconds)
+         (ftype (function (duration)
+                          (values integer integer integer rational &optional))
+                destructure-duration)
+         (ftype (function * (values duration &optional))
+                duration+ duration-)
+         (ftype (function ((or duration rational) (or duration rational))
+                          (values duration &optional))
+                duration*)
+         (ftype (function (duration (or rational duration))
+                          (values (or duration rational) &optional))
+                duration/)
+         (ftype (function (duration &optional duration)
+                          (values duration &optional))
+                duration-floor duration-ceiling duration-round)
+         (ftype (function (duration (or rational duration))
+                          (values integer duration &optional))
+                duration-divide)
+         (ftype (function (duration) (values duration &optional))
+                duration-abs)
+         (ftype (function (duration) (values boolean &optional))
+                duration-zerop duration-plusp duration-minusp)
+         (ftype (function * (values boolean &optional))
+                duration= duration/= duration< duration<= duration> duration>=))
+
 ;; Unit constructors
 (defun days (n)         (make-duration :seconds (rationalize (* n 86400))))
 (defun hours (n)        (make-duration :seconds (rationalize (* n 3600))))
@@ -143,13 +180,15 @@ scaled down duration or a ratio between two durations."
       (values quotient (make-duration :seconds remainder)))))
 
 (defmacro define-comparison-operator (name operator)
-  `(defun ,name (duration &rest durations)
-     (declare (dynamic-extent durations))
-     (if (null durations)
+  `(progn
+     (declaim (ftype (function * (values boolean &optional)) ,name))
+     (defun ,name (duration &rest durations)
+       (declare (dynamic-extent durations))
+       (if (null durations)
 	 t
 	 (loop :for i in durations
 	       :and prev-i = duration then i
-	       :always (,operator (in-seconds prev-i) (in-seconds i))))))
+	       :always (,operator (in-seconds prev-i) (in-seconds i)))))))
 
 (define-comparison-operator duration= =)
 (define-comparison-operator duration< <)
