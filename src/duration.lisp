@@ -73,8 +73,12 @@
 	    :with first-duration = (as-seconds (first durations))
 	    :finally (return (make-duration :seconds (+ first-duration difference))))))
 
-(defun duration* (duration scalar)
-  (make-duration :seconds (* (as-seconds duration) scalar)))
+(defun duration* (a b)
+  (etypecase a
+    (duration (etypecase b
+                (rational (make-duration :seconds (* (as-seconds a) b)))))
+    (rational (etypecase b
+                (duration (make-duration :seconds (* a (as-seconds b))))))))
 
 (defun duration/ (duration divisor)
   "DIVISOR can be either a scalar or another DURATION.
