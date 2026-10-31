@@ -10,10 +10,6 @@
 (defstruct duration
   (seconds 0 :type rational :read-only t))
 
-(defmethod print-object ((obj duration) stream)
-  (print-unreadable-object (obj stream :type t :identity t)
-    (format stream "P")))
-
 ;; Unit constructors
 (defun days (n)         (make-duration :seconds (* n 86400)))
 (defun hours (n)        (make-duration :seconds (* n 3600)))
@@ -24,16 +20,16 @@
 (defun nanoseconds (n)  (make-duration :seconds (/ n 1000000000)))
 
 ;; Converting to other units
-(defun as-days (d)         (/ (duration-seconds d) 86400))
-(defun as-hours (d)        (/ (duration-seconds d) 3600))
-(defun as-minutes (d)      (/ (duration-seconds d) 60))
-(defun as-seconds (d)      (duration-seconds d))
-(defun as-milliseconds (d) (* (duration-seconds d) 1000))
-(defun as-microseconds (d) (* (duration-seconds d) 1000000))
-(defun as-nanoseconds (d)  (* (duration-seconds d) 1000000000))
+(defun in-days (d)         (/ (duration-seconds d) 86400))
+(defun in-hours (d)        (/ (duration-seconds d) 3600))
+(defun in-minutes (d)      (/ (duration-seconds d) 60))
+(defun in-seconds (d)      (duration-seconds d))
+(defun in-milliseconds (d) (* (duration-seconds d) 1000))
+(defun in-microseconds (d) (* (duration-seconds d) 1000000))
+(defun in-nanoseconds (d)  (* (duration-seconds d) 1000000000))
 
 (defun destructure-duration (duration)
-  (let* ((total-seconds (as-seconds duration))
+  (let* ((total-seconds (in-seconds duration))
 	 (days (floor total-seconds 86400))
 	 (hours (floor (mod total-seconds 86400) 3600))
 	 (minutes (floor (mod total-seconds 3600) 60))
@@ -47,24 +43,24 @@
   (if (null durations)
       (seconds 0)
       (loop :for i in durations
-	    :sum (as-seconds i) into total
+	    :sum (in-seconds i) into total
 	    :finally (return (make-duration :seconds total)))))
 
 (defun duration- (duration &rest durations)
   (declare (dynamic-extent durations))
   (if (null (cdr durations))
-      (make-duration :seconds (- (as-seconds duration)))
+      (make-duration :seconds (- (in-seconds duration)))
       (loop :for i in (cdr durations)
-	    :sum (- (as-seconds i)) into difference
-	    :with first-duration = (as-seconds (first durations))
+	    :sum (- (in-seconds i)) into difference
+	    :with first-duration = (in-seconds (first durations))
 	    :finally (return (make-duration :seconds (+ first-duration difference))))))
 
 (defun duration* (a b)
   (etypecase a
     (duration (etypecase b
-                (rational (make-duration :seconds (* (as-seconds a) b)))))
+                (rational (make-duration :seconds (* (in-seconds a) b)))))
     (rational (etypecase b
-                (duration (make-duration :seconds (* a (as-seconds b))))))))
+                (duration (make-duration :seconds (* a (in-seconds b))))))))
 
 (defun duration/ (duration divisor)
   "DIVISOR can be either a scalar or another DURATION.
@@ -72,8 +68,8 @@
 Depending on the type of DIVISOR, this function either returns a
 scaled down duration or a ratio between two durations."
   (etypecase divisor
-    (rational (make-duration :seconds (/ (as-seconds duration) divisor)))
-    (duration (/ (as-seconds duration) (as-seconds divisor)))))
+    (rational (make-duration :seconds (/ (in-seconds duration) divisor)))
+    (duration (/ (in-seconds duration) (in-seconds divisor)))))
 
 (defun duration-floor (duration &optional (resolution (seconds 1)))
   "Snap DURATION down to the nearest multiple of RESOLUTION."
@@ -91,7 +87,7 @@ scaled down duration or a ratio between two durations."
     (make-duration :seconds (* (round (duration-seconds duration) res) res))))
 
 (defun duration-divide (duration divisor)
-  (multiple-value-bind (quotient remainder) (truncate (as-seconds duration) divisor)
+  (multiple-value-bind (quotient remainder) (truncate (in-seconds duration) divisor)
     (values quotient (make-duration :seconds remainder))))
 
 (defmacro define-comparison-operator (name operator)
@@ -101,7 +97,7 @@ scaled down duration or a ratio between two durations."
 	 t
 	 (loop :for i in durations
 	       :and prev-i = duration then i
-	       :always (,operator (as-seconds prev-i) (as-seconds i))))))
+	       :always (,operator (in-seconds prev-i) (in-seconds i))))))
 
 (define-comparison-operator duration= =)
 (define-comparison-operator duration/= /=)
@@ -111,14 +107,7 @@ scaled down duration or a ratio between two durations."
 (define-comparison-operator duration>= >=)
 
 (defun duration-abs (duration)
-  (make-duration :seconds (abs (as-seconds duration))))
-
-(defun duration-zerop (duration)
-  (zerop (as-seconds duration)))
-
-(defun duration-plusp (duration)
-  (plusp (as-seconds duration)))
-
-(defun duration-minusp (duration)
-  (minusp (as-seconds duration)))
-
+  (make-duration :seconds (abs (in-seconds duration))))
+(defun duration-zerop (duration)  (zerop (in-seconds duration)))
+(defun duration-plusp (duration)  (plusp (in-seconds duration)))
+(defun duration-minusp (duration) (minusp (in-seconds duration)))
