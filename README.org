@@ -2,6 +2,6 @@
 
 Currently WIP.
 
-Mainly inspired by C++'s ~<chrono>~ library. Trying to see how much
-balance between usability and performance I can get. One main goal is
-to be more performant than [[https://local-time.common-lisp.dev/][local-time]] and implement its TODOs.
+Trying to define what a modern Common Lisp library should be
+like. Performance isn't really a top priority, ergonomics and breadth
+is.
