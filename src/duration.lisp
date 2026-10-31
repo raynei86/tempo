@@ -99,11 +99,19 @@ scaled down duration or a ratio between two durations."
 	       :always (,operator (in-seconds prev-i) (in-seconds i))))))
 
 (define-comparison-operator duration= =)
-(define-comparison-operator duration/= /=)
 (define-comparison-operator duration< <)
 (define-comparison-operator duration<= <=)
 (define-comparison-operator duration> >)
 (define-comparison-operator duration>= >=)
+
+(defun duration/= (duration &rest durations)
+  (declare (dynamic-extent durations))
+  (declare (ignore duration))
+  (if (null durations)
+      t
+      (loop :for (d . rest) :on durations
+            :always (loop :for other :in rest
+			  :never (= (in-seconds d) (in-seconds other))))))
 
 (defun duration-abs (duration)
   (make-duration :seconds (abs (in-seconds duration))))
