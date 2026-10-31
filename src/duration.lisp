@@ -75,17 +75,20 @@ scaled down duration or a ratio between two durations."
     (rational (make-duration :seconds (/ (as-seconds duration) divisor)))
     (duration (/ (as-seconds duration) (as-seconds divisor)))))
 
-(defun floor-duration (duration &optional (divisor (seconds 1)))
-  (multiple-value-bind (quotient remainder) (floor (as-seconds duration) (as-seconds divisor))
-    (values quotient (make-duration :seconds remainder))))
+(defun duration-floor (duration &optional (resolution (seconds 1)))
+  "Snap DURATION down to the nearest multiple of RESOLUTION."
+  (let ((res (duration-seconds resolution)))
+    (make-duration :seconds (* (floor (duration-seconds duration) res) res))))
 
-(defun truncate-duration (duration &optional (divisor (seconds 1)))
-  (multiple-value-bind (quotient remainder) (truncate (as-seconds duration) (as-seconds divisor))
-    (values quotient (make-duration :seconds remainder))))
+(defun duration-ceiling (duration &optional (resolution (seconds 1)))
+  "Snap DURATION up to the nearest multiple of RESOLUTION."
+  (let ((res (duration-seconds resolution)))
+    (make-duration :seconds (* (ceiling (duration-seconds duration) res) res))))
 
-(defun round-duration (duration &optional (divisor (seconds 1)))
-  (multiple-value-bind (quotient remainder) (round (as-seconds duration) (as-seconds divisor))
-    (values quotient (make-duration :seconds remainder))))
+(defun duration-round (duration &optional (resolution (seconds 1)))
+  "Snap DURATION to the nearest multiple of RESOLUTION."
+  (let ((res (duration-seconds resolution)))
+    (make-duration :seconds (* (round (duration-seconds duration) res) res))))
 
 (defmacro define-comparison-operator (name operator)
   `(defun ,name (duration &rest durations)
