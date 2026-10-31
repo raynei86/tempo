@@ -76,8 +76,14 @@
 (defun duration* (duration scalar)
   (make-duration :seconds (* (as-seconds duration) scalar)))
 
-(defun duration/ (duration scalar)
-  (make-duration :seconds (/ (as-seconds duration) scalar)))
+(defun duration/ (duration divisor)
+  "DIVISOR can be either a scalar or another DURATION.
+
+Depending on the type of DIVISOR, this function either returns a
+scaled down duration or a ratio between two durations."
+  (etypecase divisor
+    (rational (make-duration :seconds (/ (as-seconds duration) divisor)))
+    (duration (/ (as-seconds duration) (as-seconds divisor)))))
 
 (defun floor-duration (duration &optional (divisor (seconds 1)))
   (multiple-value-bind (quotient remainder) (floor (as-seconds duration) (as-seconds divisor))
