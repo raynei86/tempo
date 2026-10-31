@@ -1,4 +1,4 @@
-* Tempo - A Time and Date Library
+* Tempo - A Date and Time Library
 
 Currently WIP.
 

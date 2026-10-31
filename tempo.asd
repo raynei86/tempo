@@ -6,7 +6,7 @@
   :components ((:module "src"
                 :components
                 ((:file "main"))))
-  :description "A Time and Date Library"
+  :description "A Date and Time Library"
   :in-order-to ((test-op (test-op "tempo/tests"))))
 
 (defsystem "tempo/tests"
