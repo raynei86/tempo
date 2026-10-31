@@ -64,10 +64,10 @@
 	    :sum (as-seconds i) into total
 	    :finally (return (make-duration :seconds total)))))
 
-(defun duration- (&rest durations)
+(defun duration- (duration &rest durations)
   (declare (dynamic-extent durations))
   (if (null (cdr durations))
-      (make-duration :seconds (- (as-seconds (car durations))))
+      (make-duration :seconds (- (as-seconds duration)))
       (loop :for i in (cdr durations)
 	    :sum (- (as-seconds i)) into difference
 	    :with first-duration = (as-seconds (first durations))
