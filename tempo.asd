@@ -2,7 +2,7 @@
   :version "0.0.1"
   :author "Lihui Zhang"
   :license "MIT"
-  :depends-on ()
+  :depends-on ("metabang-bind")
   :serial t
   :components ((:module "src"
                 :components

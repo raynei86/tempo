@@ -111,3 +111,34 @@ scaled down duration or a ratio between two durations."
 (defun duration-zerop (duration)  (zerop (in-seconds duration)))
 (defun duration-plusp (duration)  (plusp (in-seconds duration)))
 (defun duration-minusp (duration) (minusp (in-seconds duration)))
+
+(defun write-duration-to-iso (duration stream)
+  (let ((total (in-seconds duration)))
+    (when (zerop total) (write-string "PT0S" stream))
+    (when (minusp total)
+      (write-char #\- stream)
+      (setf total (abs total)))
+
+    (bind:bind (((:values days rd)        (truncate total 86400))
+	   ((:values hours rh)       (truncate rd 3600))
+	   ((:values minutes seconds) (truncate rh 60)))
+
+      (format stream "P~@[~dD~]~:[~;T~]~@[~dH~]~@[~dM~]"
+	      (and (plusp days) days)
+	      (plusp (+ hours minutes seconds))
+	      (and (plusp hours) hours)
+	      (and (plusp minutes) minutes))
+
+      (when (plusp seconds)
+	(if (integerp seconds)
+	    (format stream "~dS" seconds)
+	    (format stream "~FS" (float seconds 1.0d0)))))))
+
+(defun format-duration-iso (duration)
+  "Return DURATION formatted as an ISO-8601 string."
+  (with-output-to-string (s)
+    (write-duration-to-iso duration s)))
+
+(defmethod print-object ((obj duration) stream)
+  (print-unreadable-object (obj stream :type t)
+    (write-duration-to-iso obj stream)))
