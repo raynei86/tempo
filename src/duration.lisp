@@ -79,6 +79,18 @@
 (defun duration/ (duration scalar)
   (make-duration :seconds (/ (as-seconds duration) scalar)))
 
+(defun floor-duration (duration &optional (divisor (seconds 1)))
+  (multiple-value-bind (quotient remainder) (floor (as-seconds duration) (as-seconds divisor))
+    (values quotient (make-duration :seconds remainder))))
+
+(defun truncate-duration (duration &optional (divisor (seconds 1)))
+  (multiple-value-bind (quotient remainder) (truncate (as-seconds duration) (as-seconds divisor))
+    (values quotient (make-duration :seconds remainder))))
+
+(defun round-duration (duration &optional (divisor (seconds 1)))
+  (multiple-value-bind (quotient remainder) (round (as-seconds duration) (as-seconds divisor))
+    (values quotient (make-duration :seconds remainder))))
+
 (defmacro define-comparison-operator (name operator)
   `(defun ,name (duration &rest durations)
      (declare (dynamic-extent durations))
