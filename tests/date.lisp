@@ -13,7 +13,7 @@
 
 (in-package #:tempo/tests/date)
 
-;;; A float that exists only as runtime data.  A literal float in a call
+;;; A float that exists only as runtime data. A literal float in a call
 ;;; would conflict with the declared INTEGER argument types at compile
 ;;; time; indirecting it keeps the check a runtime concern.
 (defparameter *runtime-float* 1.5)
@@ -21,7 +21,7 @@
 ;;; Runtime values whose types are deliberately unknown to the compiler,
 ;;; so the checks below are runtime checks rather than compile-time
 ;;; constant diagnostics.
-(defparameter *runtime-weekday* :funday)
+(defparameter *runtime-weekday* 8)
 
 (defparameter *bad-month* 13)
 
@@ -94,10 +94,9 @@
     (ok (signals (days-in-month *bad-month*) 'error))
     (ok (signals (days-in-month 2026 *bad-month*) 'type-error)))
   (testing "day of week"
-    (ok (eq :monday (day-of-week (date 2026 11 23))))
-    (ok (eq :friday (day-of-week (date 2026 10 30))))
-    (ok (= 1 (day-of-week-number (date 2026 11 23))))
-    (ok (= 7 (day-of-week-number (date 2026 11 22)))))
+    (ok (= 1 (day-of-week (date 2026 11 23))))
+    (ok (= 5 (day-of-week (date 2026 10 30))))
+    (ok (= 7 (day-of-week (date 2026 11 22)))))
   (testing "day of year"
     (ok (= 1 (day-of-year (date 2026 1 1))))
     (ok (= 366 (day-of-year (date 2024 12 31))))
@@ -189,15 +188,16 @@
 
 (deftest test-weekdays
   (testing "next weekday is strictly after"
-    (ok (equalp (next-weekday (date 2026 10 30) :monday) (date 2026 11 2)))
-    (ok (equalp (next-weekday (date 2026 10 30) :friday) (date 2026 11 6)))
-    (ok (equalp (next-weekday (date 2026 10 26) :monday) (date 2026 11 2))))
+    (ok (equalp (next-weekday (date 2026 10 30) 1) (date 2026 11 2)))
+    (ok (equalp (next-weekday (date 2026 10 30) 5) (date 2026 11 6)))
+    (ok (equalp (next-weekday (date 2026 10 26) 1) (date 2026 11 2))))
   (testing "previous weekday is strictly before"
-    (ok (equalp (previous-weekday (date 2026 10 30) :friday) (date 2026 10 23)))
-    (ok (equalp (previous-weekday (date 2026 10 30) :monday) (date 2026 10 26)))
-    (ok (equalp (previous-weekday (date 2026 11 2) :monday) (date 2026 10 26))))
-  (testing "invalid weekday keywords are rejected"
-    (ok (signals (next-weekday (date 2026 10 30) *runtime-weekday*) 'type-error))))
+    (ok (equalp (previous-weekday (date 2026 10 30) 5) (date 2026 10 23)))
+    (ok (equalp (previous-weekday (date 2026 10 30) 1) (date 2026 10 26)))
+    (ok (equalp (previous-weekday (date 2026 11 2) 1) (date 2026 10 26))))
+  (testing "weekday numbers outside 1-7 are rejected"
+    (ok (signals (next-weekday (date 2026 10 30) *runtime-weekday*) 'type-error))
+    (ok (signals (previous-weekday (date 2026 10 30) *runtime-weekday*) 'type-error))))
 
 (deftest test-printing
   (ok (string= "#<DATE 2026-10-30>" (princ-to-string (date 2026 10 30))))

@@ -22,9 +22,7 @@
    #:leap-year-p
    #:days-in-month
    #:days-in-year
-   #:weekday
    #:day-of-week
-   #:day-of-week-number
    #:day-of-year
    #:iso-calendar
 
@@ -60,9 +58,6 @@
   (month 1 :type (integer 1 12) :read-only t)
   (day  1 :type (integer 1 31) :read-only t))
 
-(deftype weekday ()
-  '(member :monday :tuesday :wednesday :thursday :friday :saturday :sunday))
-
 (declaim (ftype (function (integer integer integer) (values date &optional))
                 date)
          (ftype (function (&key (:year integer) (:month integer) (:day integer))
@@ -88,8 +83,6 @@
          (ftype (function ((or date integer)) (values (member 365 366) &optional))
                 days-in-year)
          (ftype (function (date) (values (integer 1 7) &optional))
-                day-of-week-number)
-         (ftype (function (date) (values weekday &optional))
                 day-of-week)
          (ftype (function (date) (values (integer 1 366) &optional))
                 day-of-year)
@@ -101,7 +94,7 @@
          (ftype (function (date) (values date &optional))
                 start-of-month end-of-month start-of-year end-of-year
                 start-of-week end-of-week)
-         (ftype (function (date weekday) (values date &optional))
+         (ftype (function (date (integer 1 7)) (values date &optional))
                 next-weekday previous-weekday)
          (ftype (function () (values date &optional))
                 today yesterday tomorrow))
@@ -142,7 +135,7 @@ NIL instead of signalling."
 (defun make-date (&key (year 0 yearp) (month 1) (day 1))
   "Create a date from YEAR, MONTH, and DAY.
 
-YEAR is required; MONTH and DAY default to 1.  Signals
+YEAR is required; MONTH and DAY default to 1. Signals
 INVALID-DATE-ERROR when the fields do not name a real calendar date,
 and a TYPE-ERROR when any field is not an integer."
   (unless yearp
@@ -249,14 +242,9 @@ Examples:
 Accepts either a DATE or an integer year."
   (if (leap-year-p date-or-year) 366 365))
 
-(defun day-of-week-number (date)
-  "The ISO weekday number of DATE: 1 = Monday through 7 = Sunday."
-  (1+ (mod (1- (rata-die date)) 7)))
-
 (defun day-of-week (date)
-  "The weekday of DATE as a keyword: :MONDAY through :SUNDAY."
-  (svref #(:monday :tuesday :wednesday :thursday :friday :saturday :sunday)
-         (1- (day-of-week-number date))))
+  "The weekday of DATE as a number from 1 (Monday) through 7 (Sunday)."
+  (1+ (mod (1- (rata-die date)) 7)))
 
 (defun day-of-year (date)
   "The ordinal day of DATE within its year, from 1 to 365 or 366."
@@ -266,7 +254,7 @@ Accepts either a DATE or an integer year."
 
 (defun iso-calendar (date)
   "Return (values ISO-YEAR ISO-WEEK ISO-WEEKDAY) for DATE."
-  (let* ((weekday  (day-of-week-number date))            ; 1..7, Monday=1
+  (let* ((weekday  (day-of-week date))            ; 1..7, Monday=1
          (thursday (+ (rata-die date) (- 4 weekday)))    ; Thursday of DATE's ISO week
          (iso-year (date-year (date-from-rata-die thursday)))
          (jan-1    (rata-die (date iso-year 1 1)))
@@ -307,7 +295,7 @@ Accepts either a DATE or an integer year."
                             (day   (date-day date)))
   "Return a copy of DATE with any of YEAR, MONTH, or DAY replaced.
 
-Signals INVALID-DATE-ERROR if the result is not a real date.  When DAY
+Signals INVALID-DATE-ERROR if the result is not a real date. When DAY
 overflows the target month, the CLAMP-TO-END-OF-MONTH restart is
 available."
   (check-type year integer)
@@ -339,35 +327,25 @@ available."
   (replace-date date :month 12 :day 31))
 
 (defun start-of-week (date)
-  (date-from-rata-die (- (rata-die date) (1- (day-of-week-number date)))))
+  (date-from-rata-die (- (rata-die date) (1- (day-of-week date)))))
 
 (defun end-of-week (date)
-  (date-from-rata-die (+ (rata-die date) (- 7 (day-of-week-number date)))))
-
-(defun %weekday-number (weekday)
-  (ecase weekday
-    (:monday 1)
-    (:tuesday 2)
-    (:wednesday 3)
-    (:thursday 4)
-    (:friday 5)
-    (:saturday 6)
-    (:sunday 7)))
+  (date-from-rata-die (+ (rata-die date) (- 7 (day-of-week date)))))
 
 (defun next-weekday (date weekday)
-  "The first date strictly after DATE that falls on WEEKDAY.
+  "The first date strictly after DATE whose weekday is WEEKDAY.
 
-WEEKDAY is a keyword from :MONDAY through :SUNDAY."
-  (let* ((target (%weekday-number weekday))
-         (delta (mod (- target (day-of-week-number date)) 7)))
+WEEKDAY is a number from 1 (Monday) through 7 (Sunday)."
+  (check-type weekday (integer 1 7))
+  (let ((delta (mod (- weekday (day-of-week date)) 7)))
     (date-from-rata-die (+ (rata-die date) (if (zerop delta) 7 delta)))))
 
 (defun previous-weekday (date weekday)
-  "The last date strictly before DATE that falls on WEEKDAY.
+  "The last date strictly before DATE whose weekday is WEEKDAY.
 
-WEEKDAY is a keyword from :MONDAY through :SUNDAY."
-  (let* ((target (%weekday-number weekday))
-         (delta (mod (- (day-of-week-number date) target) 7)))
+WEEKDAY is a number from 1 (Monday) through 7 (Sunday)."
+  (check-type weekday (integer 1 7))
+  (let ((delta (mod (- (day-of-week date) weekday) 7)))
     (date-from-rata-die (- (rata-die date) (if (zerop delta) 7 delta)))))
 
 ;;; Clock
