@@ -6,7 +6,9 @@
   :serial t
   :components ((:module "src"
                 :components
-                ((:file "duration")
+                ((:file "conditions")
+		 (:file "duration")
+		 (:file "date")
                  (:file "main"))))
   :description "A Date and Time Library"
   :in-order-to ((test-op (test-op "tempo/tests"))))
@@ -19,7 +21,8 @@
   :serial t
   :components ((:module "tests"
                 :components
-		((:file "duration"))
-                ((:file "main"))))
+		((:file "date")
+		 (:file "duration")
+		 (:file "main"))))
   :description "Test system for tempo"
-  :perform (test-op (op c) (symbol-call :rove :run c))))
+  :perform (test-op (op c) (symbol-call :rove :run c)))

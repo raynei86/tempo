@@ -99,7 +99,7 @@
          (ftype (function * (values boolean &optional))
                 duration= duration/= duration< duration<= duration> duration>=))
 
-;; Unit constructors
+;;; Unit constructors
 (defun days (n)         (make-duration :seconds (rationalize (* n 86400))))
 (defun hours (n)        (make-duration :seconds (rationalize (* n 3600))))
 (defun minutes (n)      (make-duration :seconds (rationalize (* n 60))))
@@ -125,7 +125,7 @@
 	 (seconds (mod total-seconds 60)))
     (values days hours minutes seconds)))
 
-;; Arithmetic
+;;; Arithmetic
 
 (defun duration+ (&rest durations)
   (declare (dynamic-extent durations))
@@ -209,6 +209,8 @@ scaled down duration or a ratio between two durations."
 (defun duration-zerop (duration)  (zerop (in-seconds duration)))
 (defun duration-plusp (duration)  (plusp (in-seconds duration)))
 (defun duration-minusp (duration) (minusp (in-seconds duration)))
+
+;;; Formatting utils
 
 (defun write-duration-to-iso (duration stream)
   (let ((total (in-seconds duration)))
