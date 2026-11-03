@@ -264,11 +264,14 @@ Accepts either a DATE or an integer year."
 ;;; Comparisons
 
 (defmacro define-date-comparison (name operator docstring)
-  `(defun ,name (&rest dates)
+  "Define a variadic DATE comparison function NAME using OPERATOR.
+
+DOCSTRING becomes the generated function's documentation string."
+  `(defun ,name (date &rest dates)
      ,docstring
      (declare (dynamic-extent dates))
-     (loop :for a :in dates
-           :for b :in (cdr dates)
+     (loop :for a = date :then b
+           :for b :in dates
            :always (,operator (rata-die a) (rata-die b)))))
 
 (define-date-comparison date= = "True if all DATES name the same day.")
@@ -281,12 +284,14 @@ Accepts either a DATE or an integer year."
 
 (define-date-comparison date>= >= "True if DATES are in nonincreasing day order.")
 
-(defun date/= (&rest dates)
-  "True if no two of DATES name the same day."
+(defun date/= (date &rest dates)
+  "True if no two of DATE and DATES name the same day."
   (declare (dynamic-extent dates))
-  (loop :for (d . rest) :on dates
-        :always (loop :for other :in rest
-                      :never (= (rata-die d) (rata-die other)))))
+  (let ((all (cons date dates)))
+    (declare (dynamic-extent all))
+    (loop :for (d . rest) :on all
+          :always (loop :for other :in rest
+                        :never (= (rata-die d) (rata-die other))))))
 
 ;;; Adjusters
 
