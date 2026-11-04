@@ -2,9 +2,11 @@
   (:use #:cl)
   (:import-from :tempo.conditions :invalid-date-error)
   (:export
-   ;; Type, constructors, accessors
+   ;; Types, constructors, accessors
    #:date
    #:date-p
+   #:weekday
+   #:weekday-designator
    #:make-date
    #:date-year
    #:date-month
@@ -58,6 +60,24 @@
   (month 1 :type (integer 1 12) :read-only t)
   (day  1 :type (integer 1 31) :read-only t))
 
+(defmethod make-load-form ((self date) &optional environment)
+  (make-load-form-saving-slots self :environment environment))
+
+(deftype weekday ()
+  "A weekday keyword from :MONDAY through :SUNDAY."
+  '(member :monday
+           :tuesday
+           :wednesday
+           :thursday
+           :friday
+           :saturday
+           :sunday))
+
+(deftype weekday-designator ()
+  "Anything accepted where a weekday is expected: a WEEKDAY keyword or
+an integer from 1 (Monday) through 7 (Sunday)."
+  '(or weekday (integer 1 7)))
+
 (declaim (ftype (function (integer integer integer) (values date &optional))
                 date)
          (ftype (function (&key (:year integer) (:month integer) (:day integer))
@@ -94,7 +114,7 @@
          (ftype (function (date) (values date &optional))
                 start-of-month end-of-month start-of-year end-of-year
                 start-of-week end-of-week)
-         (ftype (function (date (integer 1 7)) (values date &optional))
+         (ftype (function (date weekday-designator) (values date &optional))
                 next-weekday previous-weekday)
          (ftype (function () (values date &optional))
                 today yesterday tomorrow))
@@ -337,20 +357,48 @@ available."
 (defun end-of-week (date)
   (date-from-rata-die (+ (rata-die date) (- 7 (day-of-week date)))))
 
+(defparameter *weekday-designators*
+  '(("MONDAY" . 1)
+    ("TUESDAY" . 2)
+    ("WEDNESDAY" . 3)
+    ("THURSDAY" . 4)
+    ("FRIDAY" . 5)
+    ("SATURDAY" . 6)
+    ("SUNDAY" . 7))
+  "Weekday name designators and the numbers they name.")
+
+(defun %weekday-number (designator)
+  "Coerce DESIGNATOR to a weekday number from 1 (Monday) through 7 (Sunday).
+
+DESIGNATOR is either an integer from 1 through 7, or a symbol naming a
+weekday: :MONDAY through :SUNDAY. Signals a TYPE-ERROR for anything
+else."
+  (etypecase designator
+    ((integer 1 7) designator)
+    (symbol
+     (or (cdr (assoc (string-upcase (symbol-name designator))
+                     *weekday-designators*
+                     :test #'string=))
+         (error 'type-error
+                :datum designator
+                :expected-type '(or (integer 1 7) keyword))))))
+
 (defun next-weekday (date weekday)
   "The first date strictly after DATE whose weekday is WEEKDAY.
 
-WEEKDAY is a number from 1 (Monday) through 7 (Sunday)."
-  (check-type weekday (integer 1 7))
-  (let ((delta (mod (- weekday (day-of-week date)) 7)))
+WEEKDAY is a number from 1 (Monday) through 7 (Sunday), or a weekday
+designator such as :MONDAY."
+  (let* ((weekday (%weekday-number weekday))
+         (delta (mod (- weekday (day-of-week date)) 7)))
     (date-from-rata-die (+ (rata-die date) (if (zerop delta) 7 delta)))))
 
 (defun previous-weekday (date weekday)
   "The last date strictly before DATE whose weekday is WEEKDAY.
 
-WEEKDAY is a number from 1 (Monday) through 7 (Sunday)."
-  (check-type weekday (integer 1 7))
-  (let ((delta (mod (- (day-of-week date) weekday) 7)))
+WEEKDAY is a number from 1 (Monday) through 7 (Sunday), or a weekday
+designator such as :MONDAY."
+  (let* ((weekday (%weekday-number weekday))
+         (delta (mod (- (day-of-week date) weekday) 7)))
     (date-from-rata-die (- (rata-die date) (if (zerop delta) 7 delta)))))
 
 ;;; Clock

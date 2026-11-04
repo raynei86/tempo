@@ -23,6 +23,10 @@
 ;;; constant diagnostics.
 (defparameter *runtime-weekday* 8)
 
+(defparameter *runtime-weekday-keyword* :someday)
+
+(defparameter *runtime-weekday-string* "friday")
+
 (defparameter *bad-month* 13)
 
 (deftest test-construction
@@ -177,11 +181,14 @@
     (ok (date>= (date 2026 1 1) (date 2026 1 1)))
     (ok (date= (date 2026 1 1) (date 2026 1 1))))
   (testing "variadic chains"
-    (ok (date=))
     (ok (date= (date 2026 1 1)))
     (ok (date= (date 2026 1 1) (date 2026 1 1) (date 2026 1 1)))
     (ok (date< (date 2026 1 1) (date 2026 1 2) (date 2026 1 3)))
     (ok (not (date< (date 2026 1 1) (date 2026 1 3) (date 2026 1 2)))))
+  (testing "at least one argument is required, like CL = and CL <"
+    (ok (signals (apply #'date= '()) 'error))
+    (ok (signals (apply #'date< '()) 'error))
+    (ok (signals (apply #'date/= '()) 'error)))
   (testing "inequality"
     (ok (date/= (date 2026 1 1) (date 2026 1 2) (date 2026 1 3)))
     (ok (not (date/= (date 2026 1 1) (date 2026 1 2) (date 2026 1 1))))))
@@ -195,9 +202,19 @@
     (ok (equalp (previous-weekday (date 2026 10 30) 5) (date 2026 10 23)))
     (ok (equalp (previous-weekday (date 2026 10 30) 1) (date 2026 10 26)))
     (ok (equalp (previous-weekday (date 2026 11 2) 1) (date 2026 10 26))))
+  (testing "weekday keywords are accepted"
+    (ok (equalp (next-weekday (date 2026 10 30) :monday)
+                (date 2026 11 2)))
+    (ok (equalp (previous-weekday (date 2026 10 30) :friday)
+                (date 2026 10 23))))
   (testing "weekday numbers outside 1-7 are rejected"
     (ok (signals (next-weekday (date 2026 10 30) *runtime-weekday*) 'type-error))
-    (ok (signals (previous-weekday (date 2026 10 30) *runtime-weekday*) 'type-error))))
+    (ok (signals (previous-weekday (date 2026 10 30) *runtime-weekday*) 'type-error)))
+  (testing "unknown weekday designators are rejected"
+    (ok (signals (next-weekday (date 2026 10 30) *runtime-weekday-keyword*)
+                 'type-error))
+    (ok (signals (previous-weekday (date 2026 10 30) *runtime-weekday-string*)
+                 'type-error))))
 
 (deftest test-printing
   (ok (string= "#<DATE 2026-10-30>" (princ-to-string (date 2026 10 30))))
