@@ -7,20 +7,44 @@
   (:use #:cl)
   (:export
    #:tempo-error
-   #:inexact-duration-error
-   #:inexact-duration
-   #:inexact-duration-reason
    #:invalid-date-error
    #:invalid-date-year
    #:invalid-date-month
    #:invalid-date-day
-   #:invalid-date-reason))
+   #:invalid-date-reason
+   #:invalid-time-error
+   #:invalid-time-hour
+   #:invalid-time-minute
+   #:invalid-time-second
+   #:invalid-time-reason
+   #:inexact-duration-error
+   #:inexact-duration
+   #:inexact-duration-reason))
 
 (in-package #:tempo.conditions)
 
 (define-condition tempo-error (error) ()
   (:documentation
    "Root of every error condition signalled by tempo."))
+
+(define-condition invalid-time-error (tempo-error)
+  ((hour   :initarg :hour   :type integer :reader invalid-time-hour)
+   (minute :initarg :minute :type integer :reader invalid-time-minute)
+   (second :initarg :second :reader invalid-time-second)
+   (reason :initarg :reason :initform nil :type (or null string)
+           :reader invalid-time-reason))
+  (:report
+   (lambda (condition stream)
+     (format stream "Invalid time: ~d:~2,'0d:~a~@[ (~a)~]"
+             (invalid-time-hour condition)
+             (invalid-time-minute condition)
+             (invalid-time-second condition)
+             (invalid-time-reason condition))))
+  (:documentation
+   "Signalled when hour/minute/second fields do not name a real time of
+day, e.g. 24:00:00 or 09:30:60. The invalid fields are available via
+INVALID-TIME-HOUR, INVALID-TIME-MINUTE, INVALID-TIME-SECOND, and a
+human-readable INVALID-TIME-REASON."))
 
 (define-condition inexact-duration-error (tempo-error)
   ((duration :initarg :duration :reader inexact-duration)

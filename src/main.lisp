@@ -2,6 +2,7 @@
   (:use #:cl)
   (:use-reexport #:tempo.conditions
                  #:tempo.duration
-                 #:tempo.date))
+                 #:tempo.date
+                 #:tempo.wall-time))
 
 (in-package #:tempo)
