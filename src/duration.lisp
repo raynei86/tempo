@@ -551,8 +551,8 @@ prefixed with a minus sign."
          (write-char #\- stream)
          (write-duration-to-iso (duration- duration) stream))
         (t
-         (bind:bind (((:values years months days hours minutes seconds)
-                      (destructure-duration duration)))
+         (multiple-value-bind (years months days hours minutes seconds)
+             (destructure-duration duration)
            (format stream "P~@[~dY~]~@[~dM~]~@[~dD~]~:[~;T~]~@[~dH~]~@[~dM~]"
                    (and (not (zerop years)) years)
                    (and (not (zerop months)) months)

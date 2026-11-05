@@ -2,7 +2,6 @@
   :version "0.5"
   :author "Lihui Zhang"
   :license "MIT"
-  :depends-on ("metabang-bind")
   :serial t
   :components ((:module "src"
                 :components
@@ -27,6 +26,7 @@
                  (:file "duration")
                  (:file "wall-time")
                  (:file "datetime")
-                 (:file "main"))))
+                 (:file "main")
+                 (:file "docs"))))
   :description "Test system for tempo"
   :perform (test-op (op c) (symbol-call :rove :run c)))
