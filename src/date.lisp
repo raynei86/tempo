@@ -51,7 +51,12 @@
    ;; Clock
    #:today
    #:yesterday
-   #:tomorrow))
+   #:tomorrow
+
+   ;; Formatting
+   #:write-date-to-iso
+   #:format-date-iso
+   #:format-date))
 
 (in-package #:tempo.date)
 
@@ -283,26 +288,51 @@ Accepts either a DATE or an integer year."
 
 ;;; Comparisons
 
-(defmacro define-date-comparison (name operator docstring)
-  "Define a variadic DATE comparison function NAME using OPERATOR.
+(declaim (ftype (function (date date) (values (integer -1 1) &optional))
+                %compare-date))
 
-DOCSTRING becomes the generated function's documentation string."
+(defun %compare-date (date-a date-b)
+  "Lexicographically compare DATE-A and DATE-B by (YEAR, MONTH, DAY).
+
+Returns -1 if DATE-A is earlier, 1 if it is later, and 0 if they name
+the same day. Calendar fields make this a total order, so comparisons
+never need RATA-DIE conversions."
+  (flet ((cmp (x y) (cond ((< x y) -1) ((> x y) 1) (t 0))))
+    (let ((r (cmp (date-year date-a) (date-year date-b))))
+      (if (/= r 0)
+          r
+          (let ((r (cmp (date-month date-a) (date-month date-b))))
+            (if (/= r 0)
+                r
+                (cmp (date-day date-a) (date-day date-b))))))))
+
+(defmacro define-date-comparison (name result-comparison docstring)
+  "Define a variadic DATE comparison function NAME.
+
+RESULT-COMPARISON is an expression over the variable CMP, bound to the
+value of %COMPARE-DATE for each adjacent pair of arguments."
   `(defun ,name (date &rest dates)
      ,docstring
      (declare (dynamic-extent dates))
      (loop :for a = date :then b
            :for b :in dates
-           :always (,operator (rata-die a) (rata-die b)))))
+           :for cmp = (%compare-date a b)
+           :always ,result-comparison)))
 
-(define-date-comparison date= = "True if all DATES name the same day.")
+(define-date-comparison date= (= cmp 0)
+  "True if all DATES name the same day.")
 
-(define-date-comparison date< < "True if DATES are in strictly increasing day order.")
+(define-date-comparison date< (< cmp 0)
+  "True if DATES are in strictly increasing day order.")
 
-(define-date-comparison date<= <= "True if DATES are in nondecreasing day order.")
+(define-date-comparison date<= (<= cmp 0)
+  "True if DATES are in nondecreasing day order.")
 
-(define-date-comparison date> > "True if DATES are in strictly decreasing day order.")
+(define-date-comparison date> (> cmp 0)
+  "True if DATES are in strictly decreasing day order.")
 
-(define-date-comparison date>= >= "True if DATES are in nonincreasing day order.")
+(define-date-comparison date>= (>= cmp 0)
+  "True if DATES are in nonincreasing day order.")
 
 (defun date/= (date &rest dates)
   "True if no two of DATE and DATES name the same day."
@@ -311,7 +341,7 @@ DOCSTRING becomes the generated function's documentation string."
     (declare (dynamic-extent all))
     (loop :for (d . rest) :on all
           :always (loop :for other :in rest
-                        :never (= (rata-die d) (rata-die other))))))
+                        :never (zerop (%compare-date d other))))))
 
 ;;; Adjusters
 
@@ -415,9 +445,30 @@ designator such as :MONDAY."
   (date-from-rata-die (1+ (rata-die (today)))))
 
 ;;; Printing
+
+;;; Formatting
+
+(defun write-date-to-iso (date stream)
+  "Write DATE to STREAM as an ISO-8601 calendar date, for example
+\"2026-10-30\"."
+  (format stream "~4,'0d-~2,'0d-~2,'0d"
+          (date-year date)
+          (date-month date)
+          (date-day date)))
+
+(defun format-date-iso (date)
+  "Return DATE formatted as an ISO-8601 date string."
+  (with-output-to-string (s)
+    (write-date-to-iso date s)))
+
+(defun format-date (stream date &optional colon-p at-sign-p)
+  "Write DATE to STREAM in ISO-8601 format.
+
+This is the CL:FORMAT directive function ~/tempo:format-date/.
+COLON-P and AT-SIGN-P are accepted for CL:FORMAT and ignored."
+  (declare (ignore colon-p at-sign-p))
+  (write-date-to-iso date stream))
+
 (defmethod print-object ((object date) stream)
   (print-unreadable-object (object stream :type t)
-    (format stream "~4,'0d-~2,'0d-~2,'0d"
-            (date-year object)
-            (date-month object)
-            (date-day object))))
+    (write-date-to-iso object stream)))

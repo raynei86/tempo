@@ -10,6 +10,7 @@
                  (:file "duration")
                  (:file "date")
                  (:file "wall-time")
+                 (:file "datetime")
                  (:file "main"))))
   :description "A Date and Time Library"
   :in-order-to ((test-op (test-op "tempo/tests"))))
@@ -25,6 +26,7 @@
                 ((:file "date")
                  (:file "duration")
                  (:file "wall-time")
+                 (:file "datetime")
                  (:file "main"))))
   :description "Test system for tempo"
   :perform (test-op (op c) (symbol-call :rove :run c)))
