@@ -1,0 +1,1826 @@
+\input texinfo.tex   @c -*- mode: texinfo; -*-
+@c %**start of header
+@setfilename tempo.info
+@settitle Tempo Manual
+@documentencoding UTF-8
+@documentlanguage en
+@set VERSION 0.5
+@c %**end of header
+
+@copying
+This manual is for @code{tempo} version @value{VERSION}.
+
+Copyright @copyright{} 2026 Lihui Zhang.
+
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the MIT license, the same terms as the @code{tempo}
+library itself.
+@end copying
+
+@dircategory Software development
+@direntry
+* tempo: (tempo). An ergonomic date and time library for Common Lisp.
+@end direntry
+
+@titlepage
+@title Tempo Manual
+@subtitle An ergonomic date and time library for Common Lisp
+@author Lihui Zhang
+@page
+@insertcopying
+@end titlepage
+
+@contents
+
+@ifnottex
+@node Top
+@top Tempo Manual
+
+@insertcopying
+
+@menu
+* Introduction::
+* Choosing a type::
+* Concepts::
+* Common tasks::
+* Errors and restarts::
+* Limits and roadmap::
+* Duration::
+* Date::
+* Wall time::
+* Datetime::
+* Conditions::
+* Formatting::
+* Function and Macro Index::
+* Data Type Index::
+* Variable Index::
+* Concept Index::
+@end menu
+@end ifnottex
+
+@node Introduction
+@chapter Introduction
+@cindex introduction
+
+@code{tempo} is a library for date and time manipulation, not unlike
+local-time. It attempts to bring a more ergonomic and modern experience
+with conditions, restarts, and predictable naming.
+
+@menu
+* Scope::
+* Installing and loading::
+* Five-minute tour::
+@end menu
+
+@node Scope
+@section Scope
+@cindex scope
+
+The core distinction in @code{tempo} is between @dfn{calendar values}
+and @dfn{elapsed time}:
+
+@table @asis
+@item @dfn{Calendar values} (@code{date}, @code{wall-time}, @code{datetime})
+Positions on a calendar or clock. These values are @dfn{naive}: they carry
+no timezone information.
+@item @dfn{Elapsed time} (@code{duration})
+A displacement between two points in time. @code{tempo} models elapsed
+time with two independent slots: integer calendar months and exact rational
+seconds.
+@end table
+
+The types in @code{tempo} are structure values with read-only slots; the
+public API never mutates them. They compare with @code{equalp} and work as
+@code{:test 'equalp} hash-table keys.
+
+@code{tempo} deliberately never guesses a timezone, a month length, or a
+rounding policy. When an operation requires information the value cannot
+supply, it signals a condition or offers a restart. Domain errors are reported
+through specific subtypes of @code{tempo-error}, while type mismatches
+signal direct @code{type-error}.
+
+Zoned instants (@code{timestamp}) and ranges (@code{interval}) are planned
+for later phases (@pxref{Limits and roadmap}).
+
+@node Installing and loading
+@section Installing and loading
+@cindex installation
+@cindex ASDF
+
+@code{tempo} is not yet on quicklisp, you can install it locally by
+cloning the repo to your @code{local-projects} directory, which is
+@code{~/quicklisp/local-projects/} by default.
+
+@example
+git clone https://github.com/raynei86/tempo.git ~/quicklisp/local-projects
+@end example
+
+Or alternatively via @url{https://roswell.github.io/, roswell}:
+@example
+ros install raynei86/tempo
+@end example
+
+Then it can be loaded through @code{ASDF}:
+@lisp
+(asdf:load-system "tempo")
+@end lisp
+
+@node Five-minute tour
+@section Five-minute tour
+@cindex tour
+
+@lisp
+(tempo:date 2026 10 30)
+@result{} #<DATE 2026-10-30>
+
+(tempo:wall-time 9 30)
+@result{} #<WALL-TIME 09:30:00>
+
+(tempo:datetime 2026 10 30 9 30)
+@result{} #<DATETIME 2026-10-30T09:30:00>
+
+(tempo:seconds 90)
+@result{} #<DURATION PT1M30S>
+
+(tempo:datetime-difference
+ (tempo:datetime 2026 10 31 9 30)
+ (tempo:datetime 2026 10 30 9 30))
+@result{} #<DURATION P1D>
+@end lisp
+
+The printed forms are for humans. They assume that @code{tempo} is
+accessible in the current package (for example, because your package
+uses it); if it is not, your Lisp may qualify the structure type with
+its home package. For storage and interchange, use the ISO formatters
+described in @ref{Formatting}.
+
+@node Choosing a type
+@chapter Choosing a type
+@cindex choosing a type
+
+The first decision is whether you are storing a calendar position or a
+displacement. The second is whether a timezone is part of the value.
+If two types seem to fit, prefer the smaller one: a birthday is a
+@code{date}, not a midnight @code{datetime}; opening hours are a
+@code{wall-time}, not a @code{datetime} on an arbitrary day. Using the
+smaller type prevents accidental timezone and daylight-saving
+assumptions.
+
+@menu
+* Type chooser::
+* Capability map::
+@end menu
+
+@node Type chooser
+@section Type chooser
+
+@multitable @columnfractions .30 .18 .52
+@headitem If you need to store... @tab Use @tab Because
+@item a birthday, anniversary, or billing date
+@tab @code{date}
+@tab there is no time of day and no timezone
+@item opening hours, an alarm, or a daily cutoff
+@tab @code{wall-time}
+@tab the value repeats every day and has no date
+@item an appointment or a log timestamp without a zone
+@tab @code{datetime}
+@tab both the calendar date and the clock time matter
+@item a timeout, a benchmark, or elapsed time
+@tab @code{duration}
+@tab a displacement is not a position
+@item an exact instant across timezones
+@tab not yet
+@tab @code{timestamp} is planned (@pxref{Limits and roadmap})
+@item a half-open range of dates or times
+@tab not yet
+@tab @code{interval} is planned (@pxref{Limits and roadmap})
+@item a value parsed from text
+@tab not yet
+@tab parsing is planned; validate fields for now
+@end multitable
+
+@node Capability map
+@section Capability map
+@cindex capability map
+
+This table is the honest snapshot for the current release. ``Today''
+means the implemented API; ``No'' points at the limits chapter or at a
+workaround.
+
+@multitable @columnfractions .34 .14 .52
+@headitem I want to... @tab Today @tab API or workaround
+@item store a calendar date
+@tab yes
+@tab @code{date}
+@item validate user input
+@tab yes
+@tab @code{valid-date-p}, @code{valid-wall-time-p}, @code{valid-datetime-p}
+@item add days or weeks to a date
+@tab yes
+@tab @code{rata-die} and @code{date-from-rata-die}
+@item measure the span between two dates in days
+@tab yes
+@tab subtract their @code{rata-die} values
+@item add months to a date
+@tab no
+@tab Phase 3 calendar arithmetic
+@item add seconds to a datetime
+@tab yes
+@tab @code{datetime+} and @code{datetime-}
+@item difference between two datetimes
+@tab yes
+@tab @code{datetime-difference}
+@item store a timezone-aware instant
+@tab no
+@tab @code{timestamp} is planned
+@item get the current date
+@tab yes
+@tab @code{today} (process timezone)
+@item get the current instant
+@tab no
+@tab no clock protocol yet
+@item parse an ISO 8601 string
+@tab no
+@tab parsing is planned
+@item format as an ISO 8601 string
+@tab yes
+@tab @code{format-date-iso}, @code{format-datetime-iso}, and friends
+@item sort, deduplicate, or hash values
+@tab yes
+@tab @code{date<} and friends; @code{:test 'equalp}
+@item dump a value into a FASL file
+@tab yes
+@tab @code{make-load-form}
+@end multitable
+
+The most common surprise is the missing @code{date+}. Adding days is
+exact and cheap, but it is expressed in day-number space:
+
+@lisp
+(tempo:date-from-rata-die
+ (+ (tempo:rata-die (tempo:date 2026 12 31)) 1))
+@result{} #<DATE 2027-01-01>
+@end lisp
+
+@xref{Adding days and spans} for the general recipe. Month arithmetic
+is deliberately absent: a month has no fixed number of days, so it
+needs a policy for month-end overflow (@pxref{Limits and roadmap}).
+
+@node Concepts
+@chapter Concepts
+@cindex concepts
+
+@menu
+* Exactness::
+* Months are not seconds::
+* Storage and display::
+* Signs::
+* Calendar conventions::
+* Naive time::
+* Equality::
+* Formatting types::
+@end menu
+
+@node Exactness
+@section Exactness
+@cindex exactness
+@cindex rationals
+
+@code{tempo} stores time as exact rationals, not as floating-point
+numbers.
+The unit constructors accept any real number at the boundary and
+calls @code{rationalize} on it:
+
+@lisp
+(tempo:duration-seconds (tempo:seconds 0.1))
+@result{} 1/10
+(tempo:duration-seconds (tempo:seconds (rational 0.1)))
+@result{} 13421773/134217728
+@end lisp
+
+@code{rationalize} approximates a float into a rational representation
+within its rounding precision; thus @code{0.1} becomes @code{1/10}. If
+you need the exact mathematical value of a float, use @code{rational}
+instead.
+
+@node Months are not seconds
+@section Months are not seconds
+@cindex months
+@cindex inexact durations
+
+A @code{duration} has two independent slots: integer calendar months
+and exact seconds. The slots are not interchangeable, because a month
+has no fixed length. Asking for seconds when the value has months
+signals @code{inexact-duration-error}:
+
+@lisp
+(tempo:in-seconds (tempo:months 1))
+@result{} error: INEXACT-DURATION-ERROR
+@end lisp
+
+The same rule applies in the other direction: @code{in-months} and
+@code{in-years} require the seconds slot to be zero. A year is twelve
+months, so @code{(tempo:years 1)} and @code{(tempo:months 12)} are the
+same duration:
+
+@lisp
+(tempo:duration= (tempo:years 1) (tempo:months 12))
+@result{} T
+@end lisp
+
+But a month is not thirty days. @code{duration=} compares the slots
+literally, while ordering needs a common unit:
+
+@lisp
+(tempo:duration= (tempo:months 1) (tempo:days 30))
+@result{} NIL
+@end lisp
+
+@code{(tempo:duration< (tempo:months 1) (tempo:days 30))} signals
+@code{inexact-duration-error}, because months and seconds cannot be
+ordered without a reference date. Use @code{duration=} when you mean
+``the same two slots'', and use calendar arithmetic when you mean
+``the same amount of time from this date''.
+
+@node Storage and display
+@section Storage and display
+@cindex normalization
+@cindex destructuring
+
+Storage keeps the two slots separate. Time units are converted to
+seconds within the seconds slot, while calendar months stay in the
+months slot; display decomposes both for readability. A duration of
+thirteen months prints as one year and one month, but the stored months
+slot is still thirteen:
+
+@lisp
+(tempo:duration :months 13)
+@result{} #<DURATION P1Y1M>
+
+(tempo:duration-months (tempo:duration :months 13))
+@result{} 13
+@end lisp
+
+Likewise, ninety minutes are stored as 5400 seconds and printed with
+hours and minutes:
+
+@lisp
+(tempo:duration :minutes 90)
+@result{} #<DURATION PT1H30M>
+
+(tempo:duration-seconds (tempo:duration :minutes 90))
+@result{} 5400
+@end lisp
+
+@code{destructure-duration} truncates toward zero and returns the
+components in ISO order:
+
+@lisp
+(tempo:destructure-duration (tempo:duration :months 13 :days 1))
+@result{} 1, 1, 1, 0, 0, 0
+@end lisp
+
+Do not rely on the printed form to recover the slots. Read
+@code{duration-months} and @code{duration-seconds}, or use
+@code{destructure-duration} when you want a human decomposition.
+
+@node Signs
+@section Signs
+@cindex signs
+@cindex negative durations
+
+A negative duration is written with a leading minus sign:
+
+@lisp
+(tempo:format-duration-iso (tempo:duration :seconds -10))
+@result{} "-PT10S"
+@end lisp
+
+A duration may have a positive months slot and a negative seconds slot,
+or the reverse. Such a value has no overall sign, so
+@code{duration-plusp}, @code{duration-minusp}, and @code{duration-abs}
+signal @code{inexact-duration-error}. Avoid constructing mixed-sign
+durations; if you need a signed displacement, keep the same sign on both
+slots.
+
+@node Calendar conventions
+@section Calendar conventions
+@cindex calendar
+@cindex weekday
+@cindex ISO week
+
+@code{tempo} uses the
+@url{https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar,
+proleptic Gregorian calendar}. Year 0 exists and is a leap year, and
+the constructors accept any integer year, including negative years:
+
+@lisp
+(tempo:valid-date-p 0 2 29)
+@result{} T
+
+(tempo:leap-year-p 0)
+@result{} T
+
+(tempo:date -221 1 1)
+@result{} #<TEMPO.DATE:DATE -221-01-01>
+@end lisp
+
+ISO 8601 formatting is only defined for years 0000 through 9999; see
+@ref{Formatting types}.
+
+Weekdays are numbered 1 through 7, with Monday as 1 and Sunday as 7.
+Weeks run Monday through Sunday:
+
+@lisp
+(tempo:day-of-week (tempo:date 2026 10 30))
+@result{} 5
+
+(tempo:start-of-week (tempo:date 2026 10 30))
+@result{} #<DATE 2026-10-26>
+
+(tempo:end-of-week (tempo:date 2026 10 30))
+@result{} #<DATE 2026-11-01>
+@end lisp
+
+@code{next-weekday} and @code{previous-weekday} are strict: if the date
+already falls on the requested weekday, they move to the next or
+previous week. This is usually what calendar code wants, and it makes
+the ``nth weekday'' recipe simple.
+
+ISO week numbers are not the same as calendar year and day-of-year.
+@code{iso-calendar} returns three values, and the ISO year can differ
+from the calendar year at the boundary:
+
+@lisp
+(multiple-value-list (tempo:iso-calendar (tempo:date 2021 1 1)))
+@result{} (2020 53 5)
+@end lisp
+
+January 1, 2021 is a Friday in ISO week 53 of 2020.
+
+@code{rata-die} numbers days so that 0001-01-01 is day 1 and
+0000-12-31 is day 0. Day numbers are the exact, timezone-free way to
+add days and measure spans:
+
+@lisp
+(tempo:rata-die (tempo:date 0 12 31))
+@result{} 0
+@end lisp
+
+@node Naive time
+@section Naive time
+@cindex naive time
+@cindex timezones
+
+A @code{datetime} has no timezone information. Two datetimes with the
+same fields are @code{equalp} even if one is interpreted in Tokyo and
+the other in New York, and comparing them says nothing about which
+instant is earlier.
+
+@code{today}, @code{yesterday}, and @code{tomorrow} read the process's
+local timezone through @code{get-decoded-time}. They are convenience
+functions, not a clock protocol; a test that depends on them is
+timezone-dependent and can fail around midnight.
+
+@lisp
+(tempo:today)
+@result{} #<DATE ...>
+@end lisp
+
+If you need an exact instant, wait for @code{timestamp}, or convert
+explicitly and record the zone alongside the value. Do not order
+datetimes from different zones.
+
+@node Equality 
+@section Equality
+@cindex equality
+@cindex hash tables
+@cindex FASL
+
+The values in @code{tempo} are structures with read-only slots. @code{equalp}
+compares their contents; @code{equal} compares identity, so it is false
+for two separately constructed values:
+
+@lisp
+(equalp (tempo:date 2026 10 30) (tempo:date 2026 10 30))
+@result{} T
+
+(equal (tempo:date 2026 10 30) (tempo:date 2026 10 30))
+@result{} NIL
+@end lisp
+
+Use @code{equalp} for hash tables:
+
+@lisp
+(let ((table (make-hash-table :test 'equalp)))
+  (setf (gethash (tempo:date 2026 10 30) table) :friday)
+  (gethash (tempo:date 2026 10 30) table))
+@result{} :FRIDAY
+@end lisp
+
+@node Formatting types
+@section Formatting types
+@cindex formatting
+@cindex round trip
+
+Every type has an ISO 8601 formatter: @code{format-date-iso},
+@code{format-wall-time-iso}, @code{format-datetime-iso}, and
+@code{format-duration-iso}. Each also has a stream variant named
+@code{write-TYPE-to-iso}, and a @code{cl:format} directive:
+
+@lisp
+(format nil "at ~/tempo:format-datetime/"
+        (tempo:datetime 2026 10 30 9 30))
+@result{} "at 2026-10-30T09:30:00"
+@end lisp
+
+The printed forms are:
+
+@table @code
+@item #<DURATION PT1H30M>
+@itemx #<DATE 2026-10-30>
+@itemx #<WALL-TIME 09:30:00.5>
+@itemx #<DATETIME 2026-10-30T09:30:00.5>
+@code{print-object} for the corresponding values.
+@end table
+
+ISO formatting is not lossless serializer for every
+possible value. Two caveats exist:
+
+@itemize
+@item
+Fractional seconds are printed through a double float. A
+non-terminating rational such as @code{1/3} becomes
+@code{"PT0.3333333333333333S"}. The value is still exact; only the
+string is approximate.
+@item
+Date formatting is defined for years 0000 through 9999. The
+constructors accept any integer year, but years outside that range do
+not have a conforming ISO string.
+@end itemize
+
+For round-tripping your own data, store the ISO string and parse it at
+the boundary. @code{tempo} does not provide a parser yet
+(@pxref{Limits and roadmap}).
+
+@node Common tasks
+@chapter Common tasks
+@cindex cookbook
+@cindex tasks
+
+@menu
+* Validating input::
+* Ages and birthdays::
+* Month-end dates::
+* Nth and last weekday::
+* Adding days and spans::
+* Opening hours::
+* Elapsed time::
+* Universal time and Unix epoch::
+* Sorting and hash keys::
+* ISO week reporting::
+* FASL constants::
+@end menu
+
+@node Validating input
+@section Validating input
+@cindex validation
+
+Use the total predicates at the boundary. They return @code{nil} for
+nonsense instead of signalling:
+
+@lisp
+(defun safe-date (year month day)
+  (when (tempo:valid-date-p year month day)
+    (tempo:date year month day)))
+
+(safe-date 2026 2 30)
+@result{} NIL
+
+(safe-date 2026 2 28)
+@result{} #<DATE 2026-02-28>
+@end lisp
+
+When you need to explain why the input was rejected, handle the
+condition and read its slots:
+
+@lisp
+(handler-case (tempo:date 2026 2 30)
+  (tempo:invalid-date-error (c)
+    (list :invalid
+          (tempo:invalid-date-month c)
+          (tempo:invalid-date-day c)
+          (tempo:invalid-date-reason c))))
+@result{} (:INVALID 2 30 "February 2026 has 28 days, not 30 days")
+@end lisp
+
+The same pattern works for @code{valid-wall-time-p} and
+@code{valid-datetime-p}. Remember that a non-integer field signals a
+plain @code{type-error}, not a @code{tempo-error}
+(@pxref{Errors and restarts}).
+
+Once data is inside your program, stop validating and let the
+constructors enforce the invariant. Do not pass unchecked user input
+to @code{date} or @code{wall-time} and then interpret the resulting
+condition as a validation result.
+
+@node Ages and birthdays
+@section Ages and birthdays
+@cindex age
+@cindex birthday
+@cindex February 29
+
+An age is a calendar calculation, not a division by 365. Compare the
+month and day in the target year, and decide what February 29 means.
+The @code{min} below clamps February 29 to February 28 in non-leap
+years:
+
+@lisp
+(defun birthday-in-year (birthday year)
+  (let ((month (tempo:date-month birthday)))
+    (tempo:date year
+                month
+                (min (tempo:date-day birthday)
+                     (tempo:days-in-month year month)))))
+
+(defun age-on (birthday on)
+  (let ((this-year (birthday-in-year birthday (tempo:date-year on))))
+    (if (tempo:date<= this-year on)
+        (- (tempo:date-year on) (tempo:date-year birthday))
+        (1- (- (tempo:date-year on) (tempo:date-year birthday))))))
+
+(defun next-birthday (birthday today)
+  (let ((this-year (birthday-in-year birthday (tempo:date-year today))))
+    (if (tempo:date< this-year today)
+        (birthday-in-year birthday (1+ (tempo:date-year today)))
+        this-year)))
+@end lisp
+
+@lisp
+(age-on (tempo:date 2000 2 29) (tempo:date 2026 2 28))
+@result{} 26
+
+(next-birthday (tempo:date 2000 2 29) (tempo:date 2026 3 1))
+@result{} #<DATE 2027-02-28>
+@end lisp
+
+This @code{next-birthday} includes today when today is the birthday.
+If you need strictly later, compare with @code{tempo:date<} and roll to
+the next year when equal.
+
+If your policy is ``March 1 in non-leap years'' instead, compare the
+month and day explicitly rather than clamping. The important point is
+that the policy is in your code, where it can be reviewed.
+
+@node Month-end dates
+@section Month-end dates
+@cindex month end
+@cindex billing
+
+To clamp a day to the end of a month, use @code{replace-date} and let
+the restart rewrite the overflow:
+
+@lisp
+(defun billing-date (year month day)
+  (handler-bind ((tempo:invalid-date-error
+                   (lambda (c)
+                     (declare (ignore c))
+                     (invoke-restart 'tempo:clamp-to-end-of-month))))
+    (tempo:replace-date (tempo:date year month 1) :day day)))
+
+(billing-date 2026 2 31)
+@result{} #<DATE 2026-02-28>
+@end lisp
+
+The restart is offered by @code{replace-date} and
+@code{replace-datetime}; see @ref{Month-end overflow} for the
+semantics.
+
+When you only need the last day, @code{end-of-month} is simpler:
+
+@lisp
+(tempo:end-of-month (tempo:date 2024 2 10))
+@result{} #<DATE 2024-02-29>
+@end lisp
+
+@xref{Month-end overflow} for the condition and restart details.
+
+@node Nth and last weekday
+@section Nth and last weekday
+@cindex nth weekday
+@cindex last weekday
+
+@code{next-weekday} is strict, so start one day before the month and
+step forward. Starting one day after the month makes the backwards
+version just as short:
+
+@lisp
+(defun nth-weekday (year month weekday n)
+  (loop with d = (tempo:date-from-rata-die
+                  (1- (tempo:rata-die (tempo:date year month 1))))
+        repeat n
+        do (setf d (tempo:next-weekday d weekday))
+        finally (return d)))
+
+(defun last-weekday (year month weekday)
+  (let ((end (tempo:end-of-month (tempo:date year month 1))))
+    (tempo:previous-weekday
+     (tempo:date-from-rata-die (1+ (tempo:rata-die end)))
+     weekday)))
+@end lisp
+
+@lisp
+(nth-weekday 2026 11 :thursday 3)
+@result{} #<DATE 2026-11-19>
+
+(last-weekday 2026 11 :friday)
+@result{} #<DATE 2026-11-27>
+@end lisp
+
+@var{n} must be at least 1. A large @var{n} can spill into the next
+month; if that matters, check that the result still has the requested
+month before using it.
+
+@node Adding days and spans
+@section Adding days and spans
+@cindex adding days
+@cindex day difference
+
+Day numbers make day arithmetic exact and timezone-free:
+
+@lisp
+(defun date+days (date n)
+  (tempo:date-from-rata-die (+ (tempo:rata-die date) n)))
+
+(defun days-between (a b)
+  (- (tempo:rata-die a) (tempo:rata-die b)))
+@end lisp
+
+@lisp
+(date+days (tempo:date 2026 12 31) 1)
+@result{} #<DATE 2027-01-01>
+
+(days-between (tempo:date 2026 3 1) (tempo:date 2026 2 28))
+@result{} 1
+@end lisp
+
+For second-level arithmetic on a datetime, use @code{datetime+} and
+@code{datetime-}; for the exact span between two datetimes, use
+@code{datetime-difference}. Adding calendar months to a date is a
+different operation and is not implemented yet
+(@pxref{Limits and roadmap}).
+
+@node Opening hours
+@section Opening hours
+@cindex opening hours
+@cindex overnight span
+
+Wall times compare by seconds since midnight. A half-open interval
+@code{[opening, closing)} handles the usual case, and the comparison
+wraps when closing is earlier than opening:
+
+@lisp
+(defun open-p (opening closing now)
+  (if (tempo:wall-time<= opening closing)
+      (and (tempo:wall-time<= opening now)
+           (tempo:wall-time< now closing))
+      (or (tempo:wall-time<= opening now)
+          (tempo:wall-time< now closing))))
+@end lisp
+
+@lisp
+(open-p (tempo:wall-time 9 0) (tempo:wall-time 17 0) (tempo:wall-time 12 0))
+@result{} T
+
+(open-p (tempo:wall-time 22 0) (tempo:wall-time 2 0) (tempo:wall-time 1 30))
+@result{} T
+
+(open-p (tempo:wall-time 22 0) (tempo:wall-time 2 0) (tempo:wall-time 2 0))
+@result{} NIL
+@end lisp
+
+This is wall-clock logic. It does not know about daylight-saving
+transitions, holidays, or the date. If those matter, you need a
+timezone-aware layer, which @code{tempo} does not have yet.
+
+@node Elapsed time
+@section Elapsed time
+@cindex elapsed time
+@cindex benchmarking
+
+For elapsed time inside one process, use the implementation's internal
+clock and convert the difference to an exact duration:
+
+@lisp
+(let ((start (get-internal-real-time)))
+  ;; ... work ...
+  (tempo:seconds
+   (/ (- (get-internal-real-time) start)
+      internal-time-units-per-second)))
+@end lisp
+
+The division is exact if the units divide evenly; otherwise the result
+is an exact rational. @code{get-internal-real-time} measures wall-clock
+time and is suitable for timeouts and benchmarks.
+@code{get-internal-run-time} measures processor time instead.
+
+This is not a source of calendar timestamps. There is no clock
+protocol yet, so tests that need a fixed ``now'' must pass the date in.
+
+@node Universal time and Unix epoch
+@section Universal time and Unix epoch
+@cindex universal time
+@cindex Unix time
+@cindex epoch
+
+Universal time is a non-negative integer count of seconds since
+1900-01-01 GMT. The timezone argument to @code{decode-universal-time}
+and @code{encode-universal-time} is in hours west of GMT; pass 0 for
+UTC. These helpers project a universal time to a naive datetime and
+back:
+
+@lisp
+(defun datetime-from-universal-time (ut &optional (zone 0))
+  (multiple-value-bind (second minute hour day month year)
+      (decode-universal-time ut zone)
+    (tempo:datetime year month day hour minute second)))
+
+(defun universal-time-from-datetime (dt &optional (zone 0))
+  (multiple-value-bind (year month day hour minute second)
+      (tempo:destructure-datetime dt)
+    (encode-universal-time second minute hour day month year zone)))
+@end lisp
+
+@lisp
+(datetime-from-universal-time 0)
+@result{} #<DATETIME 1900-01-01T00:00:00>
+
+(universal-time-from-datetime (tempo:datetime 1970 1 1))
+@result{} 2208988800
+@end lisp
+
+Unix time counts seconds from 1970-01-01 UTC. Computing it from day
+numbers avoids universal time's 1900 epoch and works for earlier dates:
+
+@lisp
+(defun unix-time (dt)
+  (+ (* 86400 (- (tempo:rata-die (tempo:datetime-date dt))
+                 (tempo:rata-die (tempo:date 1970 1 1))))
+     (* 3600 (tempo:datetime-hour dt))
+     (* 60 (tempo:datetime-minute dt))
+     (tempo:datetime-second dt)))
+
+(defun datetime-from-unix-time (seconds)
+  (multiple-value-bind (days rem) (floor seconds 86400)
+    (multiple-value-bind (hour rem) (truncate rem 3600)
+      (multiple-value-bind (minute second) (truncate rem 60)
+        (tempo:datetime-from-parts
+         (tempo:date-from-rata-die
+          (+ (tempo:rata-die (tempo:date 1970 1 1)) days))
+         (tempo:make-wall-time
+          :hour hour :minute minute :second second))))))
+@end lisp
+
+@lisp
+(unix-time (tempo:datetime 1970 1 1))
+@result{} 0
+
+(datetime-from-unix-time 0)
+@result{} #<DATETIME 1970-01-01T00:00:00>
+@end lisp
+
+Both helpers treat the datetime as UTC. If the value really represents
+a local time, the conversion is a projection and the zone must be
+recorded separately. Neither helper accounts for leap seconds; POSIX
+time and the @code{tempo} wall clock both ignore them.
+
+Because universal time is non-negative, dates before 1900 cannot be
+represented at all. For earlier dates, use the Unix helper or work
+directly with @code{rata-die}.
+
+@node Sorting and hash keys
+@section Sorting and hash keys
+@cindex sorting
+@cindex hash tables
+
+The comparison functions are ordinary two-argument predicates, so they
+work with @code{sort} and @code{remove-duplicates}:
+
+@lisp
+(sort (list (tempo:date 2026 1 2) (tempo:date 2025 12 31))
+      #'tempo:date<)
+@result{} (#<DATE 2025-12-31> #<DATE 2026-01-02>)
+@end lisp
+
+@code{sort} is destructive; pass a copy if the original list matters.
+For deduplication, use the type's equality predicate:
+
+@lisp
+(remove-duplicates
+ (list (tempo:date 2026 10 30) (tempo:date 2026 10 30))
+ :test #'tempo:date=)
+@result{} (#<DATE 2026-10-30>)
+@end lisp
+
+For hash tables, use @code{equalp}:
+
+@lisp
+(let ((table (make-hash-table :test 'equalp)))
+  (setf (gethash (tempo:date 2026 10 30) table) :friday)
+  (gethash (tempo:date 2026 10 30) table))
+@result{} :FRIDAY
+@end lisp
+
+Do not use @code{eq} or @code{equal} for value lookup unless you
+deliberately want identity.
+
+@node ISO week reporting
+@section ISO week reporting
+@cindex ISO week
+@cindex week number
+
+@code{iso-calendar} returns the ISO year, week, and weekday. The ISO
+year can differ from the calendar year at the boundary:
+
+@lisp
+(multiple-value-bind (year week day)
+    (tempo:iso-calendar (tempo:date 2021 1 1))
+  (format nil "~4,'0d-W~2,'0d-~d" year week day))
+@result{} "2020-W53-5"
+@end lisp
+
+The weekday value is 1 through 7 with Monday as 1, matching
+@code{day-of-week}. For display, keep the ISO year, not the calendar
+year; otherwise the week number and the year can disagree.
+
+@node FASL constants
+@section FASL constants
+@cindex FASL
+@cindex compile-file
+
+The structures in @code{tempo} define @code{make-load-form}, so they can appear in
+compiled code and be dumped into FASL files:
+
+@lisp
+(defconst *epoch* (tempo:date 1970 1 1))
+@end lisp
+
+@node Errors and restarts
+@chapter Errors and restarts
+@cindex conditions
+@cindex restarts
+@cindex errors
+
+@code{tempo} separates two tiers of mistakes. A value that is the wrong type
+signals a plain @code{type-error}. A value of the right type that does
+not name a real date or time signals a subtype of @code{tempo-error},
+which carries the offending fields and a human-readable reason.
+
+@menu
+* What signals what::
+* Handling errors:
+* Month-end overflow::
+@end menu
+
+@node What signals what
+@section What signals what
+
+@table @asis
+@item @code{date}, @code{make-date}
+@code{invalid-date-error} for an impossible date, @code{type-error}
+for a non-integer.
+@item @code{wall-time}, @code{make-wall-time}
+@code{invalid-time-error} for an impossible time, @code{type-error}
+for a non-integer.
+@item @code{datetime}, @code{make-datetime}
+It's composed of a @code{date} and @code{wall-time}, so those same
+errors can bubble up.
+@item @code{replace-date}, @code{replace-datetime}
+@code{invalid-date-error}; the @code{clamp-to-end-of-month} restart is
+offered when the day overflows.
+@item @code{in-seconds}, @code{in-days}, and friends
+@code{inexact-duration-error}; keep the months and seconds separate.
+@item @code{duration-floor}, @code{duration-ceiling}, @code{duration-round}
+@code{inexact-duration-error} when the duration has months; snap the
+seconds slot first.
+@item @code{duration-plusp}, @code{duration-minusp}, @code{duration-abs}
+@code{inexact-duration-error} for mixed signs; avoid mixed-sign
+durations.
+@item @code{duration<}, @code{duration<=}, @code{duration>}, @code{duration>=}
+@code{inexact-duration-error} for incomparable units; compare in one
+unit, or use @code{duration=}.
+@item @code{duration/}, @code{duration-divide}
+@code{inexact-duration-error} or @code{division-by-zero}; check the
+divisor and keep months whole.
+@item @code{duration} with a non-integer @code{:months}
+@code{type-error}; use an integer, or use @code{:years}.
+@end table
+
+@node Handling errors
+@section Handling errors
+
+@code{handler-case} unwinds the stack and returns a value, so it can be
+used for reporting or replacing a failed operation:
+
+@lisp
+(handler-case (tempo:date 2026 2 30)
+  (tempo:invalid-date-error (c)
+    (list (tempo:invalid-date-month c)
+          (tempo:invalid-date-day c)
+          (tempo:invalid-date-reason c))))
+@result{} (2 30 "February 2026 has 28 days, not 30 days")
+@end lisp
+
+@code{handler-bind} runs the handler in the dynamic extent where the
+condition was signalled, so it can invoke a restart and let the original
+operation finish with a different policy:
+
+@lisp
+(handler-bind ((tempo:invalid-date-error
+                 (lambda (c)
+                   (declare (ignore c))
+                   (invoke-restart 'tempo:clamp-to-end-of-month))))
+  (tempo:replace-date (tempo:date 2024 1 31) :month 2))
+@result{} #<DATE 2024-02-29>
+@end lisp
+
+@node Month-end overflow
+@section Month-end overflow
+@cindex month end
+@cindex clamp-to-end-of-month
+
+@code{replace-date} and @code{replace-datetime} validate the resulting
+date. When the requested day overflows the target month, they signal
+@code{invalid-date-error} and offer the @code{clamp-to-end-of-month}
+restart; the example under @ref{Handling errors} shows
+the invocation.
+
+@node Limits and roadmap
+@chapter Limits and roadmap
+@cindex limits
+@cindex roadmap
+
+@c TODO(user): This chapter should be in your voice. Keep it honest:
+@c users need to know what is missing before they design around it.
+
+@menu
+* Current limits::
+* Roadmap::
+@end menu
+
+@node Current limits
+@section Current limits
+@cindex missing features
+
+@xref{Capability map} for the quick answer on individual operations.
+The deferred work falls into two groups: calendar arithmetic (Phase 3)
+and zoned time (Phase 4). Everything else the capability map marks
+``No'' is deliberate scope for the current release, not a bug. In
+particular, there is no ISO parser, no default timezone or test clock,
+no non-Gregorian calendar, and no leap-second handling; the seconds
+field is always less than 60.
+
+The known rough edges are documented where they arise:
+@ref{Formatting types} for ISO output, @ref{Signs} for
+mixed-sign durations, and @ref{Naive time} for @code{today}.
+
+@node Roadmap
+@section Roadmap
+@cindex phase 3
+@cindex phase 4
+
+This is a general roadmap of the project:
+
+@table @asis
+@item Phase 1 (complete)
+Package layout, conditions, and exact durations.
+@item Phase 2 (complete)
+Naive calendar values: @code{date}, @code{wall-time}, and
+@code{datetime}, with comparisons, seconds arithmetic, and formatting.
+@item Phase 3
+Month-bearing arithmetic, @code{date+} and @code{date-}, calendar
+differences, and the month-end restarts.
+@item Phase 4
+@code{timestamp}, @code{timezone}, @code{interval}, a clock protocol,
+and daylight-saving resolution.
+@end table
+
+Until then, the workarounds in @ref{Common tasks} cover day arithmetic,
+validation, weekdays, and interoperability. If a missing feature is
+blocking you, that is useful information for the roadmap.
+
+@node Duration
+@chapter Duration
+@cindex duration
+@cindex ISO 8601
+@cindex arithmetic
+
+@deftp {Data Type} duration
+An exact span of time with two slots: an integer number of calendar
+@var{months} (a year is 12 months) and a rational number of
+@var{seconds}. The time-based unit constructors accept any real
+number and rationalize it, so there is no floating point drift; the
+calendar constructors are stricter (see @ref{Duration Units}).
+@end deftp
+
+@lisp
+(tempo:duration :hours 3/2)
+@result{} #<DURATION PT1H30M>
+(tempo:milliseconds 1)
+@result{} #<DURATION PT0.001S>
+@end lisp
+
+The default print representation uses ISO 8601. A duration with a
+months component cannot be converted to a fixed number of seconds and
+signals @code{inexact-duration-error} where exactness is required.
+
+@menu
+* Constructors and accessors: Duration Constructors.
+* Unit constructors: Duration Units.
+* Conversions: Duration Conversions.
+* Arithmetic: Duration Arithmetic.
+* Predicates and comparison: Duration Predicates.
+* Formatting: Duration Formatting.
+@end menu
+
+@node Duration Constructors
+@section Constructors and accessors
+
+@deffn {Function} make-duration &key months seconds
+The strict raw constructor. @var{months} must be an integer and
+@var{seconds} a rational; both default to 0. Prefer the unit
+constructors for everyday use.
+@end deffn
+
+@deffn {Function} duration-p object
+Return true when @var{object} is a duration.
+@end deffn
+
+@deffn {Function} duration-months duration
+@deffnx {Function} duration-seconds duration
+Return the integer months or the exact rational seconds slot.
+@end deffn
+
+@deffn {Function} duration &key years months weeks days hours minutes seconds milliseconds microseconds nanoseconds
+Return a duration combining any of the supplied units.
+@end deffn
+
+@node Duration Units
+@section Unit constructors
+
+@deffn {Function} nanoseconds n
+@deffnx {Function} microseconds n
+@deffnx {Function} milliseconds n
+@deffnx {Function} seconds n
+@deffnx {Function} minutes n
+@deffnx {Function} hours n
+@deffnx {Function} days n
+@deffnx {Function} weeks n
+@deffnx {Function} months n
+@deffnx {Function} years n
+Return a duration of @var{n} of the named unit. Every constructor
+except @code{months} accepts any real number and rationalizes it;
+@code{months} requires an integer, and @code{years} requires a real
+whose product with 12 is a whole number of months (so 1.5 years is 18
+months, while 1/5 year signals @code{inexact-duration-error}).
+@end deffn
+
+@node Duration Conversions
+@section Conversions
+
+@deffn {Function} in-seconds duration
+@deffnx {Function} in-milliseconds duration
+@deffnx {Function} in-microseconds duration
+@deffnx {Function} in-nanoseconds duration
+@deffnx {Function} in-minutes duration
+@deffnx {Function} in-hours duration
+@deffnx {Function} in-days duration
+Return the length of @var{duration} in the named unit as an exact
+rational. These signal @code{inexact-duration-error} when the duration
+has a non-zero months component.
+@end deffn
+
+@deffn {Function} in-months duration
+@deffnx {Function} in-years duration
+Return the calendar months (as an integer) or years (as an exact
+rational) of @var{duration}. These signal
+@code{inexact-duration-error} when the duration has a non-zero seconds
+component.
+@end deffn
+
+@deffn {Function} destructure-duration duration
+Return @code{(values years months days hours minutes seconds)} for
+@var{duration}. The components are truncated toward zero, and
+negative components carry the sign of their slot.
+@end deffn
+
+@node Duration Arithmetic
+@section Arithmetic
+
+@deffn {Function} duration+ &rest durations
+Return the sum of the durations. The months and seconds slots are
+summed independently.
+@end deffn
+
+@deffn {Function} duration- duration &rest durations
+Return @var{duration} minus the remaining durations. With no remaining
+arguments, return its negation.
+@end deffn
+
+@deffn {Function} duration* a b
+@deffnx {Function} duration/ duration divisor
+Scale a duration by a real number. @code{duration/} also accepts a
+duration as the divisor and then returns the exact ratio of the two
+durations. Scaling a months slot must produce a whole number of
+months; a zero divisor signals @code{division-by-zero}.
+@end deffn
+
+@deffn {Function} duration-divide duration divisor
+Return @code{(values quotient remainder-duration)}; the division
+truncates toward zero.
+@end deffn
+
+@deffn {Function} duration-floor duration &optional resolution
+@deffnx {Function} duration-ceiling duration &optional resolution
+@deffnx {Function} duration-round duration &optional resolution
+Snap @var{duration} to a multiple of @var{resolution}, which defaults
+to one second. A duration with calendar months signals
+@code{inexact-duration-error}.
+@end deffn
+
+@deffn {Function} duration-abs duration
+Return the absolute value of @var{duration}. Signals
+@code{inexact-duration-error} for a mixed-sign duration.
+@end deffn
+
+@node Duration Predicates
+@section Predicates and comparison
+@cindex comparison
+
+@deffn {Function} duration-exact-p duration
+Return true when @var{duration} has no calendar months component.
+@end deffn
+
+@deffn {Function} duration-zerop duration
+@deffnx {Function} duration-plusp duration
+@deffnx {Function} duration-minusp duration
+Sign predicates. A duration with months and seconds of opposite signs
+signals @code{inexact-duration-error}.
+@end deffn
+
+@deffn {Function} duration= duration &rest durations
+@deffnx {Function} duration/= duration &rest durations
+@deffnx {Function} duration< duration &rest durations
+@deffnx {Function} duration<= duration &rest durations
+@deffnx {Function} duration> duration &rest durations
+@deffnx {Function} duration>= duration &rest durations
+Variadic comparisons, requiring at least one argument.
+@code{duration=} compares the months and seconds slots literally.
+Ordering between a duration with non-zero months and another with
+non-zero seconds signals @code{inexact-duration-error}.
+@end deffn
+
+@node Duration Formatting
+@section Formatting
+
+@deffn {Function} format-duration-iso duration
+Return @var{duration} formatted as an ISO 8601 string. Fractional
+seconds are printed through a double float, so non-terminating
+rationals are approximate.
+@end deffn
+
+@deffn {Function} write-duration-to-iso duration stream
+Write @var{duration} to @var{stream} in ISO 8601 form.
+@end deffn
+
+@deffn {Function} format-duration stream duration &optional colon-p at-sign-p
+The @code{cl:format} directive function
+@code{~/tempo:format-duration/}.
+@end deffn
+
+@node Date
+@chapter Date
+@cindex date
+@cindex calendar
+@cindex weekdays
+
+@deftp {Data Type} date
+A proleptic Gregorian calendar date. Constructors validate their
+fields: non-integers signal @code{type-error}, while impossible
+calendar triples such as February 30 signal @code{invalid-date-error}
+with a human-readable reason. Any integer year is accepted, including
+0 and negative years.
+@end deftp
+
+@lisp
+(tempo:date 2026 10 30)
+@result{} #<DATE 2026-10-30>
+(tempo:next-weekday (tempo:date 2026 10 30) :friday)
+@result{} #<DATE 2026-11-06>
+@end lisp
+
+@deftp {Data Type} weekday
+A weekday keyword from @code{:monday} through @code{:sunday}, or an
+abbreviation such as @code{:mon}, @code{:tue}, @code{:wed},
+@code{:thu}, @code{:fri}, @code{:sat}, or @code{:sun}.
+@end deftp
+
+@deftp {Data Type} weekday-designator
+Anything accepted where a weekday is expected: a @code{weekday}
+keyword or an integer from 1 (Monday) through 7 (Sunday).
+@end deftp
+
+@menu
+* Constructors and accessors: Date Constructors.
+* Day numbers: Date Day Numbers.
+* Calendar queries: Date Queries.
+* Comparisons: Date Comparisons.
+* Adjusters: Date Adjusters.
+* Clock: Date Clock.
+* Formatting: Date Formatting.
+@end menu
+
+@node Date Constructors
+@section Constructors and accessors
+
+@deffn {Function} date year month day
+Return a @code{date}. Signals @code{invalid-date-error} when the
+fields do not name a real calendar day, and @code{type-error} when a
+field is not an integer.
+@end deffn
+
+@deffn {Function} make-date &key year month day
+Keyword constructor for a date. @var{year} is required; @var{month}
+and @var{day} default to 1.
+@end deffn
+
+@deffn {Function} date-p object
+Return true when @var{object} is a date.
+@end deffn
+
+@deffn {Function} date-year date
+@deffnx {Function} date-month date
+@deffnx {Function} date-day date
+Return the individual calendar fields.
+@end deffn
+
+@deffn {Function} destructure-date date
+Return @code{(values year month day)} for @var{date}.
+@end deffn
+
+@node Date Day Numbers
+@section Day numbers
+
+@deffn {Function} rata-die date
+Return the Rata Die day number of @var{date}, where 0001-01-01 is day 1
+and 0000-12-31 is day 0.
+@end deffn
+
+@deffn {Function} date-from-rata-die n
+Return the date with Rata Die day number @var{n}. Any integer is
+accepted; this function does not validate a range.
+@end deffn
+
+@deffn {Function} jdn date
+Return the Julian day number of @var{date} at noon.
+@end deffn
+
+@deffn {Function} date-from-jdn n
+Return the civil date with Julian day number @var{n}.
+@end deffn
+
+@node Date Queries
+@section Calendar queries
+
+@deffn {Function} valid-date-p year month day
+Return true when the three fields name a real calendar date. This
+predicate is total: non-numbers simply yield @code{nil}.
+@end deffn
+
+@deffn {Function} leap-year-p date-or-year
+@deffnx {Function} days-in-year date-or-year
+Return whether the year is a leap year, or the number of days in it.
+Each accepts either a @code{date} or an integer year.
+@end deffn
+
+@deffn {Function} days-in-month date-or-year &optional month
+Return the number of days in the month of a date, or in @var{month} of
+the integer year.
+@end deffn
+
+@deffn {Function} day-of-week date
+Return the weekday as 1 through 7, where 1 is Monday and 7 is Sunday.
+@end deffn
+
+@deffn {Function} day-of-year date
+Return the ordinal day of @var{date} within its year, from 1 to 365 or
+366.
+@end deffn
+
+@deffn {Function} iso-calendar date
+Return @code{(values iso-year iso-week iso-weekday)} for @var{date}.
+The ISO year can differ from the calendar year; for example,
+2021-01-01 is ISO 2020-W53-5.
+@end deffn
+
+@node Date Comparisons
+@section Comparisons
+
+@deffn {Function} date= date &rest dates
+@deffnx {Function} date/= date &rest dates
+@deffnx {Function} date< date &rest dates
+@deffnx {Function} date<= date &rest dates
+@deffnx {Function} date> date &rest dates
+@deffnx {Function} date>= date &rest dates
+Variadic comparisons, requiring at least one argument. They compare
+lexicographically by year, month, and day.
+@end deffn
+
+@node Date Adjusters
+@section Adjusters
+
+@deffn {Function} replace-date date &key year month day
+Return a copy of @var{date} with fields replaced. When the resulting
+day would overflow the target month, the
+@code{clamp-to-end-of-month} restart is available
+(@pxref{Month-end overflow}).
+@end deffn
+
+@deffn {Function} start-of-month date
+@deffnx {Function} end-of-month date
+@deffnx {Function} start-of-year date
+@deffnx {Function} end-of-year date
+@deffnx {Function} start-of-week date
+@deffnx {Function} end-of-week date
+Boundary adjusters. Weeks run Monday through Sunday.
+@end deffn
+
+@deffn {Function} next-weekday date weekday
+@deffnx {Function} previous-weekday date weekday
+The first date strictly after (respectively, before) @var{date} whose
+weekday is @var{weekday}. If @var{date} is already that weekday, the
+result is in the next or previous week. @var{weekday} is a
+@code{weekday-designator}.
+@end deffn
+
+@node Date Clock
+@section Clock
+
+@deffn {Function} today
+@deffnx {Function} yesterday
+@deffnx {Function} tomorrow
+Return the current local date, or the adjacent date.
+@code{today} reads the process's local timezone through
+@code{get-decoded-time}; it is not a clock protocol and is unsuitable
+for deterministic tests.
+@end deffn
+
+@node Date Formatting
+@section Formatting
+
+@deffn {Function} write-date-to-iso date stream
+Write @var{date} to @var{stream} as an ISO 8601 calendar date. The
+output is conforming for years 0000 through 9999.
+@end deffn
+
+@deffn {Function} format-date-iso date
+Return @var{date} formatted as an ISO 8601 date string. The output is
+conforming for years 0000 through 9999.
+@end deffn
+
+@deffn {Function} format-date stream date &optional colon-p at-sign-p
+The @code{cl:format} directive function @code{~/tempo:format-date/}.
+@end deffn
+
+@node Wall time
+@chapter Wall time
+@cindex wall time
+
+@deftp {Data Type} wall-time
+A time of day with no date and no zone. The second component is a
+single exact rational in the range 0 (inclusive) to 60 (exclusive).
+@end deftp
+
+@lisp
+(tempo:wall-time 9 30 1/2)
+@result{} #<WALL-TIME 09:30:00.5>
+(tempo:duration->wall-time (tempo:hours 25))
+@result{} #<WALL-TIME 01:00:00>
+@end lisp
+
+@menu
+* Constructors and accessors: Wall Time Constructors.
+* Conversions: Wall Time Conversions.
+* Comparisons: Wall Time Comparisons.
+* Formatting: Wall Time Formatting.
+@end menu
+
+@node Wall Time Constructors
+@section Constructors and accessors
+
+@deffn {Function} wall-time hour minute &optional second
+Return a @code{wall-time}. @var{second} may be any real; it is
+rationalized, so @code{(wall-time 9 30 30.5)} is exactly 09:30:30.5.
+@end deffn
+
+@deffn {Function} make-wall-time &key hour minute second
+Keyword constructor. The fields default to 0, and @var{second} must be
+a rational.
+@end deffn
+
+@deffn {Function} wall-time-p object
+Return true when @var{object} is a wall time.
+@end deffn
+
+@deffn {Function} wall-time-hour wall-time
+@deffnx {Function} wall-time-minute wall-time
+@deffnx {Function} wall-time-second wall-time
+Return the individual wall clock fields; the second is an exact
+rational.
+@end deffn
+
+@deffn {Function} valid-wall-time-p hour minute second
+Return true when the three fields name a real time of day. Total
+predicate.
+@end deffn
+
+@deffn {Function} destructure-wall-time wall-time
+Return @code{(values hour minute second)}.
+@end deffn
+
+@node Wall Time Conversions
+@section Conversions
+
+@deffn {Function} wall-time->duration wall-time
+Return the exact duration since midnight.
+@end deffn
+
+@deffn {Function} duration->wall-time duration
+Return the wall time that @var{duration} falls on since midnight. The
+dial wraps modulo 24 hours; a duration with calendar months signals
+@code{inexact-duration-error}.
+@end deffn
+
+@node Wall Time Comparisons
+@section Comparisons
+
+@deffn {Function} wall-time= wall-time &rest wall-times
+@deffnx {Function} wall-time/= wall-time &rest wall-times
+@deffnx {Function} wall-time< wall-time &rest wall-times
+@deffnx {Function} wall-time<= wall-time &rest wall-times
+@deffnx {Function} wall-time> wall-time &rest wall-times
+@deffnx {Function} wall-time>= wall-time &rest wall-times
+Variadic comparisons, requiring at least one argument.
+@end deffn
+
+@node Wall Time Formatting
+@section Formatting
+
+@deffn {Function} write-wall-time-to-iso wall-time stream
+Write @var{wall-time} to @var{stream} as an ISO 8601 time.
+Fractional seconds are printed through a double float, so
+non-terminating rationals are approximate.
+@end deffn
+
+@deffn {Function} format-wall-time-iso wall-time
+Return @var{wall-time} formatted as an ISO 8601 time string.
+Fractional seconds are printed through a double float, so
+non-terminating rationals are approximate.
+@end deffn
+
+@deffn {Function} format-wall-time stream wall-time &optional colon-p at-sign-p
+The @code{cl:format} directive function
+@code{~/tempo:format-wall-time/}.
+@end deffn
+
+@node Datetime
+@chapter Datetime
+@cindex datetime
+@cindex naive datetime
+
+@deftp {Data Type} datetime
+A naive local date and time, composing a @code{date} and a
+@code{wall-time}. It knows nothing about time zones; comparisons,
+exact differences, and seconds-level arithmetic require no timezone.
+@end deftp
+
+@lisp
+(tempo:datetime 2026 10 30 9 30 1/2)
+@result{} #<DATETIME 2026-10-30T09:30:00.5>
+(tempo:datetime+ (tempo:datetime 2026 10 30 23 59 59)
+                 (tempo:seconds 2))
+@result{} #<DATETIME 2026-10-31T00:00:01>
+@end lisp
+
+@menu
+* Constructors and accessors: Datetime Constructors.
+* Comparisons: Datetime Comparisons.
+* Difference and arithmetic: Datetime Arithmetic.
+* Adjusters: Datetime Adjusters.
+* Formatting: Datetime Formatting.
+@end menu
+
+@node Datetime Constructors
+@section Constructors and accessors
+
+@deffn {Function} datetime year month day &optional hour minute second
+Return a @code{datetime}. Errors from the component constructors
+propagate: @code{invalid-date-error} and @code{invalid-time-error} for
+impossible values, @code{type-error} for non-numeric ones.
+@end deffn
+
+@deffn {Function} make-datetime &key year month day hour minute second
+Keyword constructor; @var{year} is required. @var{second} must be a
+rational.
+@end deffn
+
+@deffn {Function} datetime-from-parts date wall-time
+Compose a datetime from an existing date and wall time. The components
+are shared, so this performs a single allocation.
+@end deffn
+
+@deffn {Function} datetime-p object
+Return true when @var{object} is a datetime.
+@end deffn
+
+@deffn {Function} datetime-date datetime
+@deffnx {Function} datetime-wall-time datetime
+Return the stored date or wall time component. Both are shared and
+non-allocating.
+@end deffn
+
+@deffn {Function} datetime-year datetime
+@deffnx {Function} datetime-month datetime
+@deffnx {Function} datetime-day datetime
+@deffnx {Function} datetime-hour datetime
+@deffnx {Function} datetime-minute datetime
+@deffnx {Function} datetime-second datetime
+Delegating field accessors.
+@end deffn
+
+@deffn {Function} valid-datetime-p year month day hour minute second
+Return true when the six fields name a real date and time. Total
+predicate.
+@end deffn
+
+@deffn {Function} destructure-datetime datetime
+Return @code{(values year month day hour minute second)}.
+@end deffn
+
+@node Datetime Comparisons
+@section Comparisons
+
+@deffn {Function} datetime= datetime &rest datetimes
+@deffnx {Function} datetime/= datetime &rest datetimes
+@deffnx {Function} datetime< datetime &rest datetimes
+@deffnx {Function} datetime<= datetime &rest datetimes
+@deffnx {Function} datetime> datetime &rest datetimes
+@deffnx {Function} datetime>= datetime &rest datetimes
+Variadic comparisons, requiring at least one argument. They compare
+lexicographically by date fields, then by wall clock fields. The
+values are naive; comparing datetimes from different zones is not
+meaningful.
+@end deffn
+
+@node Datetime Arithmetic
+@section Difference and arithmetic
+
+@deffn {Function} datetime+ datetime duration
+Return @var{datetime} advanced by @var{duration}'s exact seconds. A
+duration with a non-zero months component has no fixed second count and
+signals @code{inexact-duration-error}.
+@end deffn
+
+@deffn {Function} datetime- datetime duration
+Return @var{datetime} adjusted backward by @var{duration}'s exact
+seconds.
+@end deffn
+
+@deffn {Function} datetime-difference a b
+Return the exact duration from @var{b} to @var{a}: the value that,
+added to @var{b}, yields @var{a}. Its months component is always zero.
+@end deffn
+
+@node Datetime Adjusters
+@section Adjusters
+
+@deffn {Function} replace-datetime datetime &key year month day hour minute second
+Return a copy of @var{datetime} with any of its six fields replaced.
+The @code{clamp-to-end-of-month} restart is available when the day
+would overflow the target month
+(@pxref{Month-end overflow}).
+@end deffn
+
+@deffn {Function} start-of-day datetime
+Return midnight of @var{datetime}'s date.
+@end deffn
+
+@node Datetime Formatting
+@section Formatting
+
+@deffn {Function} write-datetime-to-iso datetime stream
+Write @var{datetime} to @var{stream} as an ISO 8601 date and time.
+Fractional seconds are printed through a double float, so
+non-terminating rationals are approximate.
+@end deffn
+
+@deffn {Function} format-datetime-iso datetime
+Return @var{datetime} formatted as an ISO 8601 date and time string.
+Fractional seconds are printed through a double float, so
+non-terminating rationals are approximate.
+@end deffn
+
+@deffn {Function} format-datetime stream datetime &optional colon-p at-sign-p
+The @code{cl:format} directive function
+@code{~/tempo:format-datetime/}.
+@end deffn
+
+@node Conditions
+@chapter Conditions
+@cindex conditions
+@cindex restarts
+
+@deffn {Condition} tempo-error
+The root of every domain error signalled by @code{tempo}. Establish a single
+handler for @code{tempo-error} to catch all of them; see
+@ref{Errors and restarts} for the separate @code{type-error} tier.
+@end deffn
+
+@deffn {Condition} invalid-date-error
+Signalled when year, month, and day do not name a real calendar date.
+@end deffn
+
+@deffn {Function} invalid-date-year condition
+@deffnx {Function} invalid-date-month condition
+@deffnx {Function} invalid-date-day condition
+@deffnx {Function} invalid-date-reason condition
+Readers for the offending fields and the human-readable reason.
+@end deffn
+
+@deffn {Condition} invalid-time-error
+Signalled when the hour, minute, or second fields do not name a real
+time of day.
+@end deffn
+
+@deffn {Function} invalid-time-hour condition
+@deffnx {Function} invalid-time-minute condition
+@deffnx {Function} invalid-time-second condition
+@deffnx {Function} invalid-time-reason condition
+Readers for the offending fields and the human-readable reason.
+@end deffn
+
+@deffn {Condition} inexact-duration-error
+Signalled when an operation needs a fixed number of seconds but the
+duration has a calendar months component, or when months and seconds
+cannot be compared without a reference date.
+@end deffn
+
+@deffn {Function} inexact-duration condition
+@deffnx {Function} inexact-duration-reason condition
+Readers for the offending duration and the human-readable reason.
+@end deffn
+
+@defvr {Restart} clamp-to-end-of-month
+Use the last day of the target month. Offered by @code{replace-date}
+and @code{replace-datetime} when the day overflows. The @code{date}
+constructor does not offer this restart.
+@end defvr
+
+@xref{Errors and restarts} for the policy and examples.
+
+@node Formatting
+@chapter Formatting
+@cindex formatting
+@cindex format directives
+
+The per-type @code{write-TYPE-to-iso} and @code{format-TYPE-iso}
+functions are documented with each type above. In addition, every
+value integrates with @code{cl:format}:
+
+@lisp
+(format nil "took ~/tempo:format-duration/" (tempo:hours 2.5))
+@result{} "took PT2H30M"
+(format nil "at ~/tempo:format-datetime/" (tempo:datetime 2026 10 30 9 30))
+@result{} "at 2026-10-30T09:30:00"
+@end lisp
+
+@xref{Formatting types} for the printed forms and the ISO
+formatting caveats.
+
+@node Function and Macro Index
+@unnumbered Function and Macro Index
+@printindex fn
+
+@node Data Type Index
+@unnumbered Data Type Index
+@printindex tp
+
+@node Variable Index
+@unnumbered Variable Index
+@printindex vr
+
+@node Concept Index
+@unnumbered Concept Index
+@printindex cp
+
+@bye
